@@ -11,10 +11,10 @@ from argparse import ArgumentParser
 from daemon import DaemonContext
 from lockfile.pidlockfile import PIDLockFile
 from settings import CONFIG
-from lib.bridge_commands import commands
 from lib.discover import discoverNHC
 from lib.hobby_api import hobbyAPI
 from lib.bridge_prompt import prompt
+from lib.nhc_control import NHCcontrol
 from lib.mylogger import mylogger
 import subprocess
 from subprocess import PIPE, run
@@ -34,7 +34,7 @@ def configure_options():
                         dest="log_level",
                         type=int,
                         required=False,
-                        default=3,
+                        default=4,
                         help=("Set default logging level: 1=Errors only, 2=Warnings, 3=Info, 4=Debug"))
     parser.add_argument("-f", "--foreground",
                         dest="foreground",
@@ -87,16 +87,6 @@ class Daemon():
         self.running = False
         self.linux_distribution = distro.id()
 
-
-    def exec_bash_command(self, command):
-        try:
-            subprocess.check_call(command, timeout=5, shell=True)
-            return True
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            self.logger.error("Execute '%s' failed", command)
-            return False
-
-
     def run(self, foreground=False):
         while True:
             try:
@@ -107,26 +97,20 @@ class Daemon():
                     self.logger.fatal("no COCO found")
                     return 1
                 self.hobby = hobbyAPI(self.logger, self.options.ca_cert_hobby, self.options.password_hobby, host=self.host)
-                self.commands = commands(self.logger, self.clilogger, self.hobby)
+                self.nhccontrol = NHCcontrol(self.logger, self.hobby)
                 self.hobby.start()
 
                 time.sleep(3)
                 self.running = overall_status(self.logger, self.hobby)
-                if self.running:
-                    pass
-
 
                 # start infinite while loop
                 if foreground:
-                    app = prompt(CONFIG, self.commands, self.clilogger)
+                    app = prompt(CONFIG, self.clilogger, self.nhccontrol)
                     sys.exit(app.cmdloop())
                 else:
                     while self.running:
                         self.running = overall_status(self.logger, self.hobby)
-                        if not self.running:
-                            pass
                         time.sleep(1)
-
 
                 return 0
             except Exception as exc:

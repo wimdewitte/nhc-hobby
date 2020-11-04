@@ -28,6 +28,11 @@ TOPIC_NOTIFICATION_RSP = "hobby/notification/rsp"
 TOPIC_NOTIFICATION_ERR = "hobby/notification/err"
 TOPIC_NOTIFICATION_EVT = "hobby/notification/evt"
 
+class NHC_MODELS():
+    RELAY = 0
+    DIMMER = 1
+    MOTOR = 2
+
 class hobbyAPI(object):
     def __init__(self, logger, ca_cert_file=None, password=None, username="hobby", port=8884, host=None, connect_timeout=60):
         self.logger = logger
@@ -44,6 +49,10 @@ class hobbyAPI(object):
         self.locations = None
         self.notifications = None
         self.device_callback = None
+        self.nhc_models = ["relay", "dimmer", "motor"]
+        self.relay_models = ["light", "socket", "switched-fan", "switched-generic"]
+        self.dimmer_models = ["dimmer"]
+        self.motor_models = ["rolldownshutter", "sunblind", "gate", "venetianblind"]
 
     def set_callbacks(self, device_callback):
         self.device_callback = device_callback
@@ -164,10 +173,7 @@ class hobbyAPI(object):
             return
         i = 1
         while i < len(namesplit):
-            if i == 1:
-                key = "MeshAddress"
-            else:
-                key = "Option" + str(i-1)
+            key = "Option" + str(i-1)
             newtrait = {key:namesplit[i]}
             self.devices[index]["Traits"].append(newtrait)
             i += 1
@@ -186,7 +192,7 @@ class hobbyAPI(object):
         frame = json.loads(msg.payload)
         message = frame["ErrMessage"]
         code = frame["ErrCode"]
-        method = frame["Method"]
+        _ = frame["Method"]
         self.logger.info("%s (code:%s)", message, code)
 
     def _device_status_update(self, device_index, frame):
@@ -284,17 +290,14 @@ class hobbyAPI(object):
             self.logger.info("no device (uuid:%s) found for action '%s'", uuid, method)  
 
 
-    def print_devices(self, filter=None):
+    def print_devices(self, filtermodel=None, filtertype=None):
         if self.devices is None:
             self.logger.warn("no NHC devices found")
             return
 
         t = PrettyTable()
-        t.field_names = ["", "Name", "Model", "Type", "Location", "UUID", "MAC", "Channel", "Online"]
-        t.align["Name"] = "l"
-        t.align["Model"] = "l"
-        t.align["Type"] = "l"
-        t.align["Location"] = "l"
+        t.field_names = ["Name", "Location", "Model", "Type", "UUID", "MAC", "Channel", "Online"]
+        t.align = "l"
         i = 0
         while i < len(self.devices):
             _device = self.devices[i]
@@ -323,44 +326,65 @@ class hobbyAPI(object):
                         _channel = value
                 j += 1
 
-            if filter == _type or filter is None:
-                t.add_row([str(i+1), _name, _model, _type, _location, _uuid, _mac, _channel, _online])
+            if (filtermodel == _model or filtermodel is None) and (filtertype == _type or filtertype is None):
+                t.add_row([_name, _location, _model, _type, _uuid, _mac, _channel, _online])
             i += 1
-        return str(t)
+        return str(t) + '\n', len(t._rows)
 
-    def search_device(self, device, modeltype, devicetype):
-        is_uuid = False
+    def print_relay_action(self):
+        data = ""
+        total = 0
+        for model in self.relay_models:
+            table, rows = self.print_devices(filtermodel=model, filtertype="action")
+            if rows:
+                data += table
+                total += rows         
+        return data, total
+
+    def print_dimmer_action(self):
+        return self.print_devices(filtermodel=self.dimmer_models[0], filtertype="action")
+
+    def print_motor_action(self):
+        data = ""
+        total = 0
+        for model in self.motor_models:
+            table, rows = self.print_devices(filtermodel=model, filtertype="action")
+            if rows:
+                data += table
+                total += rows         
+        return data, total
+
+    def search_uuid_action(self, uuid, nhcmodel):
         try:
-            UUID(device)
-            is_uuid = True
+            UUID(uuid)
         except ValueError:
-            pass
-
+            return None
+        if nhcmodel == NHC_MODELS.RELAY:
+            models = self.relay_models
+        elif nhcmodel == NHC_MODELS.DIMMER:
+            models = self.dimmer_models
+        elif nhcmodel == NHC_MODELS.MOTOR:
+            models = self.motor_models
+        else:
+            return None
         i = 0
-        found = False
+        found = None
         while i < len(self.devices):
             _device = self.devices[i]
             _name = _device["Name"]
             _model = _device["Model"]
             _type = _device["Type"]
             _uuid = _device["Uuid"]
-            if _model == modeltype and _type == devicetype:
-                if is_uuid:
-                    if device == _uuid: 
-                        device = _uuid
-                        found = True
+            if _type == "action":
+                for model in models:
+                    if uuid == _uuid and model == _model:
+                        found = uuid
                         break
-                else:
-                    if device == _name:
-                        device = _uuid
-                        found = True
-                        break
+            if found is not None:
+                break
             i += 1
 
-        if found:
-            return device
-        else:
-            return None
+        return found
 
 
     def locations_list_get(self):
