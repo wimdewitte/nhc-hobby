@@ -46,11 +46,26 @@ class prompt(cli.Cmd):
         else:
             self.help_devices()
             return
-        table, _ = self.nhccontrol.hobby.print_devices(filtermodel=None, filtertype=_type)
+        table, _ = self.nhccontrol.hobby.print_devices(filtermodel=None, filtertype=_type, fulltable=True)
         self.clilogger.cli_info(table)
 
     def help_devices(self):
         self.clilogger.cli_neutral("Print all NHC devices, arg1 (optional): type filter on Type")
+
+    @cli.with_argument_list
+    @cli.with_category("NHC")
+    def do_mood(self, args):
+        if len(args) != 1:
+            self.help_mood()
+            table, _ = self.nhccontrol.hobby.print_mood_action()
+            self.clilogger.cli_info(table)
+            return
+ 
+        ret = self.nhccontrol.mood(args[0])
+        self.validate_nhc_return(ret, "mood")
+        
+    def help_mood(self):
+        self.clilogger.cli_neutral("Set mood. arg1: device/uuid")
 
     @cli.with_argument_list
     @cli.with_category("NHC")

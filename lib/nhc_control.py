@@ -10,11 +10,23 @@ class NHCcontrol(object):
     def __init__(self, logger, hobby):
         self.logger = logger
         self.hobby = hobby
+        self.hobby.set_callbacks(self.status_change)
+
+    def status_change(self, model, frame):
+        pass
+
+    def mood(self, device):
+        device = self.hobby.search_uuid_action(device, NHC_MODELS.MOOD)
+        if device is None:
+            return NHC_RET.DEVICE
+
+        self.hobby.devices_control(device, "BasicState", "Triggered")
+        return NHC_RET.OK
 
     def relay(self, device, value):
         try:
             value = int(value)
-            if value > 1:
+            if value >= 1:
                 value = "On"
             else:
                 value = "Off"

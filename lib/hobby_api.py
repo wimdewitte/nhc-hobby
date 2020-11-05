@@ -29,9 +29,11 @@ TOPIC_NOTIFICATION_ERR = "hobby/notification/err"
 TOPIC_NOTIFICATION_EVT = "hobby/notification/evt"
 
 class NHC_MODELS():
-    RELAY = 0
-    DIMMER = 1
-    MOTOR = 2
+    ALL = 0
+    RELAY = 1
+    DIMMER = 2
+    MOTOR = 3
+    MOOD = 4
 
 class hobbyAPI(object):
     def __init__(self, logger, ca_cert_file=None, password=None, username="hobby", port=8884, host=None, connect_timeout=60):
@@ -47,12 +49,12 @@ class hobbyAPI(object):
         self.systeminfo = None
         self.devices = None
         self.locations = None
-        self.notifications = None
         self.device_callback = None
-        self.nhc_models = ["relay", "dimmer", "motor"]
+        self.nhc_models = ["relay", "dimmer", "motor", "mood"]
         self.relay_models = ["light", "socket", "switched-fan", "switched-generic"]
         self.dimmer_models = ["dimmer"]
         self.motor_models = ["rolldownshutter", "sunblind", "gate", "venetianblind"]
+        self.mood_models = ["comfort", "alloff", "generic"]
 
     def set_callbacks(self, device_callback):
         self.device_callback = device_callback
@@ -91,6 +93,7 @@ class hobbyAPI(object):
         self.client.disconnect()
 
     def _message(self, client, obj, msg):
+        #self.logger.info("Hobby mqtt message topic:%s\n%s", msg.topic, json.loads(msg.payload))
         if msg.topic == TOPIC_DEVICES_RSP:
             self._message_devices_response(client, msg)
         elif msg.topic == TOPIC_DEVICES_ERR:
@@ -108,9 +111,9 @@ class hobbyAPI(object):
         elif msg.topic == TOPIC_SYSTEM_TIME_RSP:
             self._message_system_time_response(client, msg)
         elif msg.topic == TOPIC_NOTIFICATION_RSP:
-            self._message_notification_response(client, msg)
+            self._message_notification_event(client, msg)
         elif msg.topic == TOPIC_NOTIFICATION_ERR:
-            self._message_notification_response(client, msg)
+            self._message_notification_error(client, msg)
         elif msg.topic == TOPIC_NOTIFICATION_EVT:
             self._message_notification_event(client, msg)
         else:
@@ -135,7 +138,7 @@ class hobbyAPI(object):
         self.systeminfo_get()
         self.devices_list_get()
         self.locations_list_get()
-        self.notifications_list_get()
+        #self.notifications_list_get() --> do not ask for a list of past notifications
 
     def disconnect(self, client, userdata, rc):
         self.logger.warning("Disconnected from HobbyAPI")
@@ -222,7 +225,7 @@ class hobbyAPI(object):
         self.logger.info("device '%s' status changed: %s", name, frame)
         
         if self.device_callback is not None and call_callback:
-            self.device_callback(device_index, frame["Properties"])
+            self.device_callback(self.devices[device_index]["Model"], frame)
 
 
     def _message_devices_event(self, client, msg):
@@ -290,13 +293,16 @@ class hobbyAPI(object):
             self.logger.info("no device (uuid:%s) found for action '%s'", uuid, method)  
 
 
-    def print_devices(self, filtermodel=None, filtertype=None):
+    def print_devices(self, filtermodel=None, filtertype=None, fulltable=False):
         if self.devices is None:
             self.logger.warn("no NHC devices found")
             return
 
         t = PrettyTable()
-        t.field_names = ["Name", "Location", "Model", "Type", "UUID", "MAC", "Channel", "Online"]
+        if fulltable:
+            t.field_names = ["Name", "Location", "Model", "Type", "UUID", "MAC", "Channel", "Online"]
+        else:
+            t.field_names = ["Name", "Location", "Model", "Type", "UUID"]
         t.align = "l"
         i = 0
         while i < len(self.devices):
@@ -312,10 +318,15 @@ class hobbyAPI(object):
                 _online = _device["Online"]
             except:
                 _online = "?"
-            try:
-                _location = _device["Parameters"][0]["LocationName"]
-            except:
-                pass
+            j = 0
+            while j < len(_device["Parameters"]):
+                parameter = _device["Parameters"][j]
+                for key, value in parameter.items(): 
+                    if key == "LocationName":
+                        _location = value
+                    elif key == "LocationIcon":
+                        _location_icon = value
+                j += 1
             j = 0
             while j < len(_device["Traits"]):
                 trait = _device["Traits"][j]
@@ -327,9 +338,22 @@ class hobbyAPI(object):
                 j += 1
 
             if (filtermodel == _model or filtermodel is None) and (filtertype == _type or filtertype is None):
-                t.add_row([_name, _location, _model, _type, _uuid, _mac, _channel, _online])
+                if fulltable:
+                    t.add_row([_name, _location, _model, _type, _uuid, _mac, _channel, _online])
+                else:
+                    t.add_row([_name, _location, _model, _type, _uuid])
             i += 1
-        return str(t) + '\n', len(t._rows)
+        return str(t.get_string(sortby="Name")) + '\n', len(t._rows)
+
+    def print_mood_action(self):
+        data = ""
+        total = 0
+        for model in self.mood_models:
+            table, rows = self.print_devices(filtermodel=model, filtertype="action")
+            if rows:
+                data += table
+                total += rows         
+        return data, total
 
     def print_relay_action(self):
         data = ""
@@ -359,14 +383,16 @@ class hobbyAPI(object):
             UUID(uuid)
         except ValueError:
             return None
-        if nhcmodel == NHC_MODELS.RELAY:
+        if nhcmodel == NHC_MODELS.MOOD:
+            models = self.mood_models
+        elif nhcmodel == NHC_MODELS.RELAY:
             models = self.relay_models
         elif nhcmodel == NHC_MODELS.DIMMER:
             models = self.dimmer_models
         elif nhcmodel == NHC_MODELS.MOTOR:
             models = self.motor_models
         else:
-            return None
+            models = self.relay_models + self.dimmer_models + self.motor_models
         i = 0
         found = None
         while i < len(self.devices):
@@ -385,7 +411,6 @@ class hobbyAPI(object):
             i += 1
 
         return found
-
 
     def locations_list_get(self):
         if not self.connected:
@@ -431,7 +456,7 @@ class hobbyAPI(object):
             offset = params[0]["TimeInfo"][0]["GMTOffset"]
             timezone = params[0]["TimeInfo"][0]["Timezone"]
             time = params[0]["TimeInfo"][0]["UTCTime"]
-            self.logger.debug("time info: %s (offset:%s, timezone:%s)", time, offset, timezone)
+            #self.logger.debug("time info: %s (offset:%s, timezone:%s)", time, offset, timezone)
         elif method == "systeminfo.published":
             self._update_systeminfo(frame["Params"][0]["SystemInfo"][0])
         else:
@@ -468,23 +493,27 @@ class hobbyAPI(object):
         frame["Params"] = [frame_notifications]
         self.client.publish(TOPIC_NOTIFICATION_CMD, json.dumps(frame))
 
-    def _message_notification_response(self, client, msg):
-        frame = json.loads(msg.payload)
-        method = frame["Method"]
-        if method == "notifications.list":
-            self.notifications = frame["Params"][0]["Notifications"]
-            pass
-        elif method == "notifications.update":
-            # TODO
-            pass
-        else:
-            self.logger.info("unknown method: %s", method)
-
     def _message_notification_error(self, client, msg):
         frame = json.loads(msg.payload)
         self.logger.info(frame)
 
     def _message_notification_event(self, client, msg):
         frame = json.loads(msg.payload)
-        self.logger.info(frame)
-
+        j = 0
+        while j < len(frame["Params"]):
+            parameter = frame["Params"][j]
+            i = 0
+            while i < len(parameter['Notifications']):
+                notification = parameter['Notifications'][i]
+                for key, value in notification.items(): 
+                    if key == "Type":
+                        _type = value
+                    elif key == "Text":
+                        _text = value
+                    elif key == "Status":
+                        _status = value
+                self.logger.info("notification type:'%s' status:'%s', text:'%s'", _type, _status, _text)
+                #if _status == 'new':
+                    # TODO callback
+                i += 1
+            j += 1
