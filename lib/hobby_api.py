@@ -151,15 +151,22 @@ class hobbyAPI(object):
         frame = {"Method": "devices.list"}
         self.client.publish(TOPIC_DEVICES_CMD, json.dumps(frame))
 
-    def get_devices(self):
-        return self.devices
+    def get_device(self, uuid):
+        i = 0
+        while i < len(self.devices):
+            if self.devices[i]["Uuid"] == uuid:
+                return self.devices[i]
+            i += 1
+        return None
 
-    def devices_control(self, uuid, property, value):
+    def devices_control(self, uuid, property1, value1, property2=None, value2=None):
         if not self.connected:
             return False
         frame = {}
         frame["Method"] = "devices.control"
-        frame_property = {property: value}
+        frame_property = {property1: value1}
+        if property2 is not None and value2 is not None:
+            frame_property[property2] = value2
         frame_device = {}
         frame_device["Uuid"] = uuid
         frame_device["Properties"] = [frame_property]
@@ -225,7 +232,7 @@ class hobbyAPI(object):
         self.logger.info("device '%s' status changed: %s", name, frame)
         
         if self.device_callback is not None and call_callback:
-            self.device_callback(self.devices[device_index]["Model"], frame)
+            self.device_callback(self.devices[device_index], frame)
 
 
     def _message_devices_event(self, client, msg):

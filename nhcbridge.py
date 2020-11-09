@@ -13,6 +13,7 @@ from lockfile.pidlockfile import PIDLockFile
 from settings import CONFIG
 from lib.discover import discoverNHC
 from lib.hobby_api import hobbyAPI
+from lib.hass import Hass
 from lib.bridge_prompt import prompt
 from lib.nhc_control import NHCcontrol
 from lib.mylogger import mylogger
@@ -29,7 +30,7 @@ class AppFailed(Exception):
 
 
 def configure_options():
-    parser = ArgumentParser(description="NHC bridge BT mesh")
+    parser = ArgumentParser(description="NHC Hass bridge")
     parser.add_argument("-l", "--log-level",
                         dest="log_level",
                         type=int,
@@ -69,12 +70,13 @@ def configure_options():
     return options
 
 
-def overall_status(logger, hobby):
+def overall_status(logger, hobby, hass):
     status_hobby = hobby.is_connected()
-    if status_hobby:
+    status_hass = hass.is_connected()
+    if status_hobby and status_hass:
         return True
     else:
-        logger.error("Fault status: hobby:%d", status_hobby)
+        logger.error("Fault status: hobby:%d, hass:%d", status_hobby, status_hass)
         return False
 
 
@@ -84,6 +86,7 @@ class Daemon():
         self.clilogger = clilogger
         self.logger = clilogger.get_logger()
         self.hobby = None
+        self.hass = None
         self.running = False
         self.linux_distribution = distro.id()
 
@@ -97,19 +100,23 @@ class Daemon():
                     self.logger.fatal("no COCO found")
                     return 1
                 self.hobby = hobbyAPI(self.logger, self.options.ca_cert_hobby, self.options.password_hobby, host=self.host)
+                self.hass = Hass(self.logger, hobby=self.hobby)
                 self.nhccontrol = NHCcontrol(self.logger, self.hobby)
                 self.hobby.start()
+                self.hass.start()
+                self.hobby.set_callbacks(self.hass.nhc_status_update)
 
+                # give some time to connect
                 time.sleep(3)
-                self.running = overall_status(self.logger, self.hobby)
+                self.running = overall_status(self.logger, self.hobby, self.hass)
 
                 # start infinite while loop
                 if foreground:
-                    app = prompt(CONFIG, self.clilogger, self.nhccontrol)
+                    app = prompt(CONFIG, self.clilogger, self.nhccontrol, self.hass)
                     sys.exit(app.cmdloop())
                 else:
                     while self.running:
-                        self.running = overall_status(self.logger, self.hobby)
+                        self.running = overall_status(self.logger, self.hobby, self.hass)
                         time.sleep(1)
 
                 return 0
@@ -124,6 +131,8 @@ class Daemon():
         self.logger.info("Shutting down with signal %s", signal.Signals(signum).name)
         if self.hobby is not None:
             self.hobby.stop()
+        if self.hass is not None:
+            self.hass.stop()
 
 
 class CreateApp(object):
