@@ -13,7 +13,7 @@ from lockfile.pidlockfile import PIDLockFile
 from settings import CONFIG
 from lib.discover import discoverNHC
 from lib.hobby_api import hobbyAPI
-from lib.hass import Hass
+from hass.mqtt import Hass
 from lib.bridge_prompt import prompt
 from lib.nhc_control import NHCcontrol
 from lib.mylogger import mylogger

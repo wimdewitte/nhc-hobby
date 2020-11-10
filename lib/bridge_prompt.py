@@ -128,8 +128,7 @@ class prompt(cli.Cmd):
                 remove = True
         except:
             pass
-        ret = self.hass.discover(args[0], remove)
-        pass
+        self.hass.discover(args[0], remove)
 
     def help_discover(self):
         self.clilogger.cli_neutral("Discover. arg1: device/uuid, arg2 (optional): remove")
