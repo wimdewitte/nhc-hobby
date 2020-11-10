@@ -164,12 +164,13 @@ class hobbyAPI(object):
             return False
         frame = {}
         frame["Method"] = "devices.control"
-        frame_property = {property1: value1}
+        frame_properties = {}
+        frame_properties[property1] = value1
         if property2 is not None and value2 is not None:
-            frame_property[property2] = value2
+            frame_properties[property2] = value2
         frame_device = {}
         frame_device["Uuid"] = uuid
-        frame_device["Properties"] = [frame_property]
+        frame_device["Properties"] = [frame_properties]
         frame_devices = {}
         frame_devices["Devices"] = [frame_device]
         frame["Params"] = [frame_devices]

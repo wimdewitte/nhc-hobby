@@ -77,8 +77,8 @@ class Hass(object):
         topic_split = msg.topic.split("/")
         hass_type = topic_split[1]
         uuid = topic_split[2]
-        frame = json.loads(msg.payload)
         if hass_type == "light":
+            frame = json.loads(msg.payload)
             state = frame["state"].capitalize()
             try:
                 brightness = frame["brightness"]
@@ -86,6 +86,9 @@ class Hass(object):
             except:
                 brightness = None
             self.hobby.devices_control(uuid, "Status", state, "Brightness", brightness)
+        elif hass_type == "switch":
+            state = msg.payload.decode('ascii').capitalize()
+            self.hobby.devices_control(uuid, "Status", state)
         pass
 
     def nhc_to_hass_model(self, nhc_model):
@@ -95,9 +98,11 @@ class Hass(object):
             return "cover"
         elif nhc_model == "switched-fan":
             return "fan"
-        elif nhc_model == "socket":
+        elif nhc_model in ["socket", "switched-generic"]:
             return "switch"
-        elif nhc_model in ["switched-generic", "comfort", "alloff", "generic", "alarm", "condition", "pir", "timeschedule"]:
+        elif nhc_model in ["pir", "alarms"]:
+            return "binary_sensor"
+        elif nhc_model in ["comfort", "condition", "alloff", "generic", "timeschedule"]:
             self.logger.info("NHC model '%s' not supported in Hass", nhc_model)
             return None
 
@@ -106,11 +111,10 @@ class Hass(object):
         main_topic = "homeassistant/light/" + uuid
         config_topic = main_topic + "/config"
         payload = {}
-        payload["~"] = main_topic
         payload["name"] = name
         payload["unique_id"] = uuid
-        payload["cmd_t"] = "~/set"
-        payload["stat_t"] = "~/state"
+        payload["command_topic"] = main_topic + "/set"
+        payload["state_topic"] = main_topic + "/state"
         payload["schema"] = "json"
         if device["Model"] == "dimmer":
             payload["brightness"] = True
@@ -135,9 +139,26 @@ class Hass(object):
         frame = {}
         frame["state"] = status
         if brightness is not None:
-            frame["brightness"] = int(brightness * 2.54)
+            frame["brightness"] = int(brightness * 2.55)
 
         self.client.publish(topic, json.dumps(frame))
+
+    def discover_switch(self, device, name):
+        uuid = device["Uuid"]
+        main_topic = "homeassistant/switch/" + uuid
+        config_topic = main_topic + "/config"
+        payload = {}
+        payload["name"] = name
+        payload["unique_id"] = uuid
+        payload["command_topic"] = main_topic + "/set"
+        payload["state_topic"] = main_topic + "/state"
+        self.client.publish(config_topic, json.dumps(payload))
+        self.update_switch(uuid, device["Properties"])
+
+    def update_switch(self, uuid, properties):
+        status = properties[0]["Status"].upper()
+        topic = "homeassistant/switch/" + uuid + "/state"
+        self.client.publish(topic, status)
 
     def discover(self, uuid, remove=False):
         exist = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
@@ -158,8 +179,10 @@ class Hass(object):
             self.client.publish(topic, '')
             return True
 
-        if [ hass_model == "light"]:
+        if hass_model == "light":
             self.discover_light(device, hass_name)
+        elif hass_model == "switch":
+            self.discover_switch(device, hass_name)
 
         pass
 
@@ -168,6 +191,7 @@ class Hass(object):
         if hass_model is None:
             return
         uuid = device["Uuid"]
-        if [ hass_model == "light"]:
+        if hass_model == "light":
             self.update_light(uuid, frame["Properties"])
-        pass
+        if hass_model == "switch":
+            self.update_switch(uuid, frame["Properties"])
