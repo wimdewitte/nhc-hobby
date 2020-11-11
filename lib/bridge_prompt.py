@@ -6,7 +6,7 @@ from nhc.control import NHC_RET
 
 class prompt(cli.Cmd):
     def __init__(self, clilogger, nhccontrol, hass):
-        super().__init__()
+        super().__init__(allow_cli_args=False)
         self.clilogger = clilogger
         self.nhccontrol = nhccontrol
         self.hass = hass
