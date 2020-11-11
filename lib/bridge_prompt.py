@@ -2,32 +2,18 @@ import sys
 import time
 import cmd2 as cli
 from cmd2 import style, ansi
-from lib.nhc_control import NHC_RET
+from nhc.control import NHC_RET
 
 class prompt(cli.Cmd):
-    def __init__(self, config, clilogger, nhccontrol, hass):
+    def __init__(self, clilogger, nhccontrol, hass):
         super().__init__()
-        self.config = config
         self.clilogger = clilogger
         self.nhccontrol = nhccontrol
         self.hass = hass
-        self.hidden_commands.append('py')
-        self.hidden_commands.append('edit')
         self.prompt = style('NHC> ', fg='blue', bold=True)
-        self.intro = style('Welcome! Type ? to list commands', fg='blue', bg='white', bold=True)
-        self.locals_in_py = True
+        self.self_in_py = True
         self.default_category = 'cmd2 Built-in Commands'
 
-    def precmd(self, line):
-        self.clilogger.set_cmd_from_mqtt(False)
-        return line
-
-    def postcmd(self, stop: bool, line: str) -> bool:
-        # give some time, otherwise logger prints between response
-        time.sleep(0.1)
-        # make sure prompt is visible after every command
-        self.clilogger.cli_neutral("")
-        return stop
     
     def validate_nhc_return(self, value, actiontype=""):
         if value == NHC_RET.ARGS:

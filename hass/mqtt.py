@@ -3,7 +3,7 @@ import threading
 import json
 import logging
 import socket
-from lib.hobby_api import NHC_MODELS
+from nhc.hobby_api import NHC_MODELS
 from hass.light import HassLight
 from hass.switch import HassSwitch
 

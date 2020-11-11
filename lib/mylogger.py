@@ -7,22 +7,20 @@ LOG_FORMAT = "%(asctime)s.%(msecs)03d - %(levelname)s: %(message)s"
 
 class mylogger(object):
     def __init__(self, name, loglevel):
-        self.logger = None
-        self._loglevel = loglevel
         self.logger = logging.getLogger(name)
-        self.logger.setLevel(loglevel)
-        self.mqttclient = None
         self.set_cli2logger(False)
-        self.cmd_from_mqtt = False # if True, command initiated by cli
-
-    def set_cmd_from_mqtt(self, mode):
-        self.cmd_from_mqtt = mode
+        if loglevel == 1:
+            self._loglevel = logging.ERROR
+        elif loglevel == 2:
+            self._loglevel = logging.WARNING
+        elif loglevel == 3:
+            self._loglevel = logging.INFO
+        else:
+            self._loglevel = logging.DEBUG
+        self.logger.setLevel(self._loglevel)
 
     def set_cli2logger(self, mode):
         self.cli2logger = mode
-
-    def set_mqtt(self, mqttclient):
-        self.mqttclient = mqttclient
 
     def set_level(self, args):
         if len(args) != 1:
@@ -73,13 +71,10 @@ class mylogger(object):
         return self.logger
 
     def _cli_print(self, level, color, msg):
-        if not self.cmd_from_mqtt:
-            colored_str = ansi.style(msg, fg=color)
-            print(colored_str)
+        colored_str = ansi.style(msg, fg=color)
+        print(colored_str)
         if len(msg) == 0:
             return
-        if self.cmd_from_mqtt:
-            self.mqttclient.publish_log(level, msg)
         if self.cli2logger:
             if level == logging.INFO:
                 self.logger.info(msg)

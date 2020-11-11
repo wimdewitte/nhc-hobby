@@ -1,11 +1,13 @@
 import os
 import paho.mqtt.client as mqtt
+from nhc.discover import discoverNHC
 import threading
 import json
 import logging
 import struct
 from prettytable import PrettyTable
 from uuid import UUID
+import yaml
 
 
 TOPIC_DEVICES_CMD = "hobby/control/devices/cmd"
@@ -36,14 +38,13 @@ class NHC_MODELS():
     MOOD = 4
 
 class hobbyAPI(object):
-    def __init__(self, logger, ca_cert_file=None, password=None, username="hobby", port=8884, host=None, connect_timeout=60):
+    def __init__(self, logger, configfile=None):
         self.logger = logger
-        self.host = host
-        self.port = port
-        self.ca_cert_file = ca_cert_file
-        self.password = password
-        self.username = username
-        self.connect_timeout = connect_timeout
+        self.configfile = configfile
+        self.discover = discoverNHC(self.logger)
+        self.host = self.discover.discover()
+        self.port = 8884
+        self.connect_timeout = 60
         self.connected = False
         self.client = None
         self.systeminfo = None
@@ -55,6 +56,23 @@ class hobbyAPI(object):
         self.dimmer_models = ["dimmer"]
         self.motor_models = ["rolldownshutter", "sunblind", "gate", "venetianblind"]
         self.mood_models = ["comfort", "alloff", "generic"]
+        self.read_config()
+
+
+    def read_config(self):
+        if self.configfile is None:
+            self.logger.fatal("No configfile specified")
+            return
+        if not os.path.exists(self.configfile):
+            self.logger.fatal("config file does not exist")
+            return
+        with open(self.configfile, mode='r') as fp:
+            try:
+                self.config = yaml.load(fp, Loader=yaml.FullLoader)
+            except yaml.YAMLError:
+                self.logger.fatal("config file not readable")
+                return
+            pass
 
     def set_callbacks(self, device_callback):
         self.device_callback = device_callback
@@ -70,7 +88,23 @@ class hobbyAPI(object):
         return self.connected
 
     def start(self):
-        if self.host is None or self.password is None or self.ca_cert_file is None:
+        try:
+            self.password = self.config["password"]
+        except:
+            self.logger.error("no password in config")
+            return
+        try:
+            self.username = self.config["username"]
+        except:
+            self.logger.error("no username in config")
+            return
+        try:
+            self.ca_cert_file = self.config["ca_cert_hobby"]
+        except:
+            self.logger.error("no ca_cert in config")
+            return
+        if self.host is None:
+            self.logger.error("no COCO found")
             return
         if not os.path.exists(self.ca_cert_file):
             self.logger.error("Cannot find ca_cert file")

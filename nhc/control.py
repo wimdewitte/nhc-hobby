@@ -1,4 +1,4 @@
-from lib.hobby_api import NHC_MODELS
+from nhc.hobby_api import NHC_MODELS
 
 
 class NHC_RET():

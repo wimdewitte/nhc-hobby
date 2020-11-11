@@ -5,23 +5,17 @@ import os
 import logging
 import signal
 import time
-import distro
 from traceback import format_exc
 from argparse import ArgumentParser
 from daemon import DaemonContext
 from lockfile.pidlockfile import PIDLockFile
-from settings import CONFIG
-from lib.discover import discoverNHC
-from lib.hobby_api import hobbyAPI
+from nhc.hobby_api import hobbyAPI
+from nhc.control import NHCcontrol
 from hass.mqtt import Hass
 from lib.bridge_prompt import prompt
-from lib.nhc_control import NHCcontrol
 from lib.mylogger import mylogger
 import subprocess
 from subprocess import PIPE, run
-
-
-DAEMONNAME = "hobbyAPI"
 
 
 class AppFailed(Exception):
@@ -31,43 +25,11 @@ class AppFailed(Exception):
 
 def configure_options():
     parser = ArgumentParser(description="NHC Hass bridge")
-    parser.add_argument("-l", "--log-level",
-                        dest="log_level",
-                        type=int,
-                        required=False,
-                        default=4,
-                        help=("Set default logging level: 1=Errors only, 2=Warnings, 3=Info, 4=Debug"))
-    parser.add_argument("-f", "--foreground",
-                        dest="foreground",
-                        action='store_true',
-                        required=False,
-                        default=False,
-                        help=("Run in foreground"))
-    parser.add_argument("-a", "--action",
-                        dest="action",
-                        required=False,
-                        default="start",
-                        help=("Action (start,stop,pid)"))
-    options, unknown_args = parser.parse_known_args()
-
-    # Perform surgery on sys.argv to remove the arguments which have already been processed by argparse
-    sys.argv = sys.argv[:1] + unknown_args
-
-    if options.log_level == 1:
-        options.log_level = logging.ERROR
-    elif options.log_level == 2:
-        options.log_level = logging.WARNING
-    elif options.log_level == 3:
-        options.log_level = logging.INFO
-    else:
-        options.log_level = logging.DEBUG
-    
-    options.abspath = os.path.abspath(os.path.dirname(__file__))
-    options.appname = DAEMONNAME
-    options.ca_cert_hobby = os.path.join(options.abspath, CONFIG.CA_CERT_HOBBY)
-    options.password_hobby = CONFIG.PASSWORD_HOBBY
-
-    return options
+    parser.add_argument('-l', '--loglevel', help='Loglevel: 1=Error, 2=Warning, 3=Info, 4=Debug', default=1, required=False)
+    parser.add_argument('-c', '--config', help='Config file location', required=True, default="./nhc.yaml")
+    parser.add_argument('-f', '--foreground', help='Run in foreground', default=False, action='store_true')
+    parser.add_argument('-a', '--action', help='Action (start,stop,pid)', default="start", required=False)
+    return parser.parse_args()
 
 
 def overall_status(logger, hobby, hass):
@@ -88,18 +50,12 @@ class Daemon():
         self.hobby = None
         self.hass = None
         self.running = False
-        self.linux_distribution = distro.id()
 
     def run(self, foreground=False):
         while True:
             try:
                 self.logger.info("NHC Bridge started")
-                discover = discoverNHC(self.logger)
-                self.host = discover.discover()
-                if self.host is None:
-                    self.logger.fatal("no COCO found")
-                    return 1
-                self.hobby = hobbyAPI(self.logger, self.options.ca_cert_hobby, self.options.password_hobby, host=self.host)
+                self.hobby = hobbyAPI(self.logger, self.options.config)
                 self.hass = Hass(self.logger, hobby=self.hobby)
                 self.nhccontrol = NHCcontrol(self.logger, self.hobby)
                 self.hobby.start()
@@ -112,7 +68,7 @@ class Daemon():
 
                 # start infinite while loop
                 if foreground:
-                    app = prompt(CONFIG, self.clilogger, self.nhccontrol, self.hass)
+                    app = prompt(self.clilogger, self.nhccontrol, self.hass)
                     sys.exit(app.cmdloop())
                 else:
                     while self.running:
@@ -138,13 +94,11 @@ class Daemon():
 class CreateApp(object):
     def __init__(self, options):
         self.options = options
-        self._foreground = options.foreground
-        self._action = options.action
         self._pidfile = None
 
     def run_app(self):
-        self.clilogger = mylogger(self.options.appname, self.options.log_level)
-        if self._foreground:
+        self.clilogger = mylogger("nhcbridge", self.options.loglevel)
+        if self.options.foreground:
             self.clilogger.set_logger_stream()
         else:
             self.clilogger.set_logger_syslog()
@@ -155,30 +109,31 @@ class CreateApp(object):
             self.logger.error("Failed ({0})".format(str(e)))
 
     def start_app(self, options, clilogger):
-        if self._action != "start" and self._action != "stop" and self._action != "status" and self._action != "restart":
+        _action = self.options.action
+        if _action != "start" and _action != "stop" and _action != "status" and _action != "restart":
             raise AppFailed("Invalid action specified")
 
         if os.access("/var/run/", os.W_OK):
-            self._pidfile = "/var/run/" + self.options.appname + ".pid"
+            self._pidfile = "/var/run/nhcbridge.pid"
         else:
-            self._pidfile = "/var/tmp/" + self.options.appname + ".pid"
+            self._pidfile = "/var/tmp/nhcbridge.pid"
 
         pid_file = PIDLockFile(self._pidfile)
 
-        if self._action == "stop":
+        if _action == "stop":
             if pid_file.is_locked():
                 self.logger.info("Stopping service with pid %d", pid_file.read_pid())
                 os.kill(pid_file.read_pid(), signal.SIGTERM)
             return 0
 
-        elif self._action == "status":
+        elif _action == "status":
             if pid_file.is_locked():
                 self.logger.info("Service running with pid %d", pid_file.read_pid())
                 return 0
             self.logger.info("Service not running")
             return 1
 
-        elif self._action == "start":
+        elif _action == "start":
             if pid_file.is_locked():
                 self.logger.info("Service already running with pid %d", pid_file.read_pid())
                 return 1
@@ -197,15 +152,16 @@ class CreateApp(object):
 
         context.signal_map = {signal.SIGTERM: daemon.shutdown, signal.SIGINT: daemon.shutdown}
 
-        if self._foreground:
+        if self.options.foreground:
             self.logger.info("Starting service in foreground")
             try:
-                daemon.run(self._foreground)
+                daemon.run(self.options.foreground)
             except (SystemExit, KeyboardInterrupt):
                 daemon.shutdown(2, None)
         else:
             with context:
-                self.logger.info("Starting service with pid %d", pid_file.read_pid())
+                self.logger.info(
+                    "Starting service with pid %d", pid_file.read_pid())
                 try:
                     daemon.run(foreground=False)
                 except SystemExit:
