@@ -37,6 +37,33 @@ class NHC_MODELS():
     MOTOR = 3
     MOOD = 4
 
+
+class controlNHC(object):
+    def __init__(self, hobby):
+        self.hobby = hobby
+
+    def mood(self, device):
+        if self.hobby.search_uuid_action(device, NHC_MODELS.MOOD) is None:
+            return
+        self.hobby.devices_control(device, "BasicState", "Triggered")
+
+    def relay(self, device, status):
+        if self.hobby.search_uuid_action(device, NHC_MODELS.RELAY) is None:
+            return
+        self.hobby.devices_control(device, "Status", status)
+
+    def dimmer(self, device, status, brightness):
+        if self.hobby.search_uuid_action(device, NHC_MODELS.DIMMER) is None:
+            return
+        self.hobby.devices_control(device, "Status", status, "Brightness", str(brightness))
+
+    def motor(self, device, action, position):
+        if self.hobby.search_uuid_action(device, NHC_MODELS.MOTOR) is None:
+            return
+        self.hobby.devices_control(
+            device, "Action", action, "Position", str(position))
+
+
 class hobbyAPI(object):
     def __init__(self, logger, configfile=None):
         self.logger = logger
@@ -198,13 +225,14 @@ class hobbyAPI(object):
             return False
         frame = {}
         frame["Method"] = "devices.control"
-        frame_properties = {}
-        frame_properties[property1] = value1
-        if property2 is not None and value2 is not None:
-            frame_properties[property2] = value2
         frame_device = {}
+        frame_property1 = {property1: value1}
+        if property2 is not None and value2 is not None:
+            frame_property2 = {property2: value2}
+            frame_device["Properties"] = [frame_property1, frame_property2]
+        else:
+            frame_device["Properties"] = [frame_property1]
         frame_device["Uuid"] = uuid
-        frame_device["Properties"] = [frame_properties]
         frame_devices = {}
         frame_devices["Devices"] = [frame_device]
         frame["Params"] = [frame_devices]
@@ -379,46 +407,40 @@ class hobbyAPI(object):
                         _channel = value
                 j += 1
 
-            if (filtermodel == _model or filtermodel is None) and (filtertype == _type or filtertype is None):
+            if filtermodel is None:
+                _print_model = True
+            elif _model in filtermodel:
+                _print_model = True
+            else:
+                _print_model = False
+
+            if filtertype is None:
+                _print_type = True
+            elif filtertype == _type:
+                _print_type = True
+            else:
+                _print_type = False
+
+            if _print_model and _print_type:
                 if fulltable:
                     t.add_row([_name, _location, _model, _type, _uuid, _mac, _channel, _online])
                 else:
                     t.add_row([_name, _location, _model, _type, _uuid])
             i += 1
-        return str(t.get_string(sortby="Name")) + '\n', len(t._rows)
+        return str(t.get_string(sortby="Name"))
 
     def print_mood_action(self):
-        data = ""
-        total = 0
-        for model in self.mood_models:
-            table, rows = self.print_devices(filtermodel=model, filtertype="action")
-            if rows:
-                data += table
-                total += rows         
-        return data, total
+        return self.print_devices(filtermodel=self.mood_models, filtertype="action")
 
     def print_relay_action(self):
-        data = ""
-        total = 0
-        for model in self.relay_models:
-            table, rows = self.print_devices(filtermodel=model, filtertype="action")
-            if rows:
-                data += table
-                total += rows         
-        return data, total
+        return self.print_devices(filtermodel=self.relay_models, filtertype="action")
 
     def print_dimmer_action(self):
-        return self.print_devices(filtermodel=self.dimmer_models[0], filtertype="action")
+        return self.print_devices(filtermodel=self.dimmer_models, filtertype="action")
 
     def print_motor_action(self):
-        data = ""
-        total = 0
-        for model in self.motor_models:
-            table, rows = self.print_devices(filtermodel=model, filtertype="action")
-            if rows:
-                data += table
-                total += rows         
-        return data, total
+        return self.print_devices(filtermodel=self.motor_models, filtertype="action")
+
 
     def search_uuid_action(self, uuid, nhcmodel):
         try:
@@ -452,6 +474,8 @@ class hobbyAPI(object):
                 break
             i += 1
 
+        if not found:
+            self.logger.warning("uuid not found")
         return found
 
     def locations_list_get(self):

@@ -1,8 +1,9 @@
 import sys
 import time
+import argparse
 import cmd2 as cli
 from cmd2 import style, ansi
-from nhc.control import NHC_RET
+
 
 class prompt(cli.Cmd):
     def __init__(self, clilogger, nhccontrol, hass):
@@ -14,115 +15,96 @@ class prompt(cli.Cmd):
         self.self_in_py = True
         self.default_category = 'cmd2 Built-in Commands'
 
-    
-    def validate_nhc_return(self, value, actiontype=""):
-        if value == NHC_RET.ARGS:
-            self.clilogger.cli_error("wrong arguments for {} action".format(actiontype))
-        elif value == NHC_RET.DEVICE:
-            self.clilogger.cli_error("device not found or not a {} action".format(actiontype))
-        else:
-            self.clilogger.cli_info("set {} successfully".format(actiontype))
+    loglevel_parser = argparse.ArgumentParser()
+    loglevel_parser.add_argument(
+        '-l', '--level', help='Loglevel: d-ebug, i-nfo, w-arning, e-rror', choices=['d', 'i', 'w', 'e'], required=True)
 
-    @cli.with_argument_list
+    @cli.with_argparser(loglevel_parser)
     @cli.with_category("miscellaneous")
     def do_loglevel(self, args):
-        self.clilogger.set_loglevel(args)
- 
-    def help_loglevel(self):
-        self.clilogger.cli_neutral("Change the loglevel. arg1: d=debug, i=info, w=warning, e=error")
+        self.clilogger.set_loglevel(args.level)
 
-    @cli.with_argument_list
+    devices_parser = argparse.ArgumentParser()
+    devices_parser.add_argument('-m', '--model', help='Filter NHC model')
+    devices_parser.add_argument('-t', '--type', help='Filter NHC type')
+    devices_parser.add_argument('-f', '--full', help='Print full table', action='store_true', default=False)
+
+    @cli.with_argparser(devices_parser)
     @cli.with_category("NHC")
     def do_devices(self, args):
-        if len(args) == 0:
-            _type = None
-        elif len(args) == 1:
-            _type = args[0]
-        else:
-            self.help_devices()
-            return
-        table, _ = self.nhccontrol.hobby.print_devices(filtermodel=None, filtertype=_type, fulltable=True)
-        self.clilogger.cli_info(table)
+        if args.model is not None:
+            args.model = [args.model]
+        _table = self.nhccontrol.hobby.print_devices(
+            filtermodel=args.model, filtertype=args.type, fulltable=args.full)
+        self.clilogger.cli_info(_table)
 
-    def help_devices(self):
-        self.clilogger.cli_neutral("Print all NHC devices, arg1 (optional): type filter on Type")
+    mood_parser = argparse.ArgumentParser()
+    mood_parser.add_argument('-u', '--uuid', help='NHC UUID device')
+    mood_parser.add_argument('-p', '--print', help='Print table with moods', action='store_true')
 
-    @cli.with_argument_list
+    @cli.with_argparser(mood_parser)
     @cli.with_category("NHC")
     def do_mood(self, args):
-        if len(args) != 1:
-            self.help_mood()
-            table, _ = self.nhccontrol.hobby.print_mood_action()
-            self.clilogger.cli_info(table)
-            return
- 
-        ret = self.nhccontrol.mood(args[0])
-        self.validate_nhc_return(ret, "mood")
-        
-    def help_mood(self):
-        self.clilogger.cli_neutral("Set mood. arg1: device/uuid")
+        if args.print:
+            _table = self.nhccontrol.hobby.print_mood_action()
+            self.clilogger.cli_info(_table)
+        if args.uuid is not None:
+            self.nhccontrol.mood(args.uuid)
 
-    @cli.with_argument_list
+    relay_parser = argparse.ArgumentParser()
+    relay_parser.add_argument('-u', '--uuid', help='NHC UUID device')
+    relay_parser.add_argument('-v', '--view', help='View table with relays', action='store_true')
+    relay_parser.add_argument('-s', '--status', help='Status: On or Off', choices=['On', 'Off'])
+
+    @cli.with_argparser(relay_parser)
     @cli.with_category("NHC")
     def do_relay(self, args):
-        if len(args) != 2:
-            self.help_relay()
-            table, _ = self.nhccontrol.hobby.print_relay_action()
-            self.clilogger.cli_info(table)
-            return
- 
-        ret = self.nhccontrol.relay(args[0], args[1])
-        self.validate_nhc_return(ret, "relay")
-        
-    def help_relay(self):
-        self.clilogger.cli_neutral("Set relay. arg1: device/uuid, arg2: state (0 or 1)")
+        if args.view:
+            _table = self.nhccontrol.hobby.print_relay_action()
+            self.clilogger.cli_info(_table)
+        if args.uuid is not None:
+            self.nhccontrol.relay(args.uuid, args.status)
 
-    @cli.with_argument_list
+    dimmer_parser = argparse.ArgumentParser()
+    dimmer_parser.add_argument('-u', '--uuid', help='NHC UUID device')
+    dimmer_parser.add_argument('-v', '--view', help='View table with relays', action='store_true')
+    dimmer_parser.add_argument('-s', '--status', help='Status: On or Off', choices=['On', 'Off'])
+    dimmer_parser.add_argument('-b', '--brightness', help='Brightness 0->100', type=int, choices=range(0, 100+1))
+
+    @cli.with_argparser(dimmer_parser)
     @cli.with_category("NHC")
     def do_dimmer(self, args):
-        if len(args) != 2:
-            self.help_dimmer()
-            table, _ = self.nhccontrol.hobby.print_dimmer_action()
-            self.clilogger.cli_info(table)
-            return
- 
-        ret = self.nhccontrol.dimmer(args[0], args[1])
-        self.validate_nhc_return(ret, "dimmer")
+        if args.view:
+            _table = self.nhccontrol.hobby.print_dimmer_action()
+            self.clilogger.cli_info(_table)
+        if args.uuid is not None:
+            self.nhccontrol.dimmer(args.uuid, args.status, args.brightness)
 
+    motor_parser = argparse.ArgumentParser()
+    motor_parser.add_argument('-u', '--uuid', help='NHC UUID device')
+    motor_parser.add_argument('-v', '--view', help='View table with relays', action='store_true')
+    motor_parser.add_argument('-a', '--action', help='Action', choices=['Open', 'Close', 'Stop'])
+    motor_parser.add_argument('-p', '--position', help='Position', type=int, choices=range(0, 100+1))
 
-    def help_dimmer(self):
-        self.clilogger.cli_neutral("Set dimmer. arg1: device/uuid, arg2: value 'on', 'off', '0->100')")
-
-    @cli.with_argument_list
+    @cli.with_argparser(motor_parser)
     @cli.with_category("NHC")
     def do_motor(self, args):
-        if len(args) != 2:
-            self.help_motor()
-            table, _ = self.nhccontrol.hobby.print_motor_action()
-            self.clilogger.cli_info(table)
-            return
- 
-        ret = self.nhccontrol.motor(args[0], args[1])
-        self.validate_nhc_return(ret, "motor")
+        if args.view:
+            _table = self.nhccontrol.hobby.print_motor_action()
+            self.clilogger.cli_info(_table)
+        if args.uuid is not None:
+            self.nhccontrol.motor(args.uuid, args.action, args.position)
 
-    def help_motor(self):
-        self.clilogger.cli_neutral("Set motor. arg1: device/uuid, arg2: value 'on', 'off', '0->100')")
+    discover_parser = argparse.ArgumentParser()
+    discover_parser.add_argument('-u', '--uuid', help='NHC UUID device')
+    discover_parser.add_argument('-v', '--view', help='View table with actions', action='store_true')
+    discover_parser.add_argument('-r', '--remove', help='Remove device', action='store_true', default=False)
 
-    @cli.with_argument_list
+    @cli.with_argparser(discover_parser)
     @cli.with_category("Hass")
     def do_discover(self, args):
-        if len(args) < 1 or len(args) > 2:
-            self.help_discover()
-            table, _ = self.nhccontrol.hobby.print_devices(filtertype="action")
-            self.clilogger.cli_info(table)
-            return
-        remove = False
-        try:
-            if args[1] == "remove":
-                remove = True
-        except:
-            pass
-        self.hass.discover(args[0], remove)
-
-    def help_discover(self):
-        self.clilogger.cli_neutral("Discover. arg1: device/uuid, arg2 (optional): remove")
+        if args.view:
+            _table = self.nhccontrol.hobby.print_devices(filtertype="action")
+            self.clilogger.cli_info(_table)
+        if args.uuid is not None:
+            self.hass.discover(args.uuid, args.remove)

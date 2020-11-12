@@ -9,8 +9,7 @@ from traceback import format_exc
 from argparse import ArgumentParser
 from daemon import DaemonContext
 from lockfile.pidlockfile import PIDLockFile
-from nhc.hobby_api import hobbyAPI
-from nhc.control import NHCcontrol
+from nhc.hobby_api import hobbyAPI, controlNHC
 from hass.mqtt import Hass
 from lib.bridge_prompt import prompt
 from lib.mylogger import mylogger
@@ -56,8 +55,8 @@ class Daemon():
             try:
                 self.logger.info("NHC Bridge started")
                 self.hobby = hobbyAPI(self.logger, self.options.config)
+                self.nhccontrol = controlNHC(self.hobby)
                 self.hass = Hass(self.logger, hobby=self.hobby)
-                self.nhccontrol = NHCcontrol(self.logger, self.hobby)
                 self.hobby.start()
                 self.hass.start()
                 self.hobby.set_callbacks(self.hass.nhc_status_update)
