@@ -8,21 +8,10 @@ LOG_FORMAT = "%(asctime)s.%(msecs)03d - %(levelname)s: %(message)s"
 class mylogger(object):
     def __init__(self, name, loglevel):
         self.logger = logging.getLogger(name)
-        self.set_cli2logger(False)
-        if loglevel == 1:
-            self._loglevel = logging.ERROR
-        elif loglevel == 2:
-            self._loglevel = logging.WARNING
-        elif loglevel == 3:
-            self._loglevel = logging.INFO
-        else:
-            self._loglevel = logging.DEBUG
-        self.logger.setLevel(self._loglevel)
+        self.set_loglevel(['i'])
 
-    def set_cli2logger(self, mode):
-        self.cli2logger = mode
 
-    def set_level(self, args):
+    def set_loglevel(self, args):
         if len(args) != 1:
             self.cli_info("Current loglevel: {}".format(logging.getLevelName(self._loglevel)))
             return
@@ -39,7 +28,7 @@ class mylogger(object):
             return
 
         self.logger.setLevel(self._loglevel)
-        self.cli_info("Changed loglevel to {}".format(logging._levelToName[self._loglevel]))
+        self.cli_info("loglevel {}".format(logging._levelToName[self._loglevel]))
 
 
     def set_logger_stream(self):
@@ -75,13 +64,12 @@ class mylogger(object):
         print(colored_str)
         if len(msg) == 0:
             return
-        if self.cli2logger:
-            if level == logging.INFO:
-                self.logger.info(msg)
-            elif level == logging.WARNING:
-                self.logger.warning(msg)
-            elif level == logging.ERROR:
-                self.logger.error(msg)
+        if level == logging.INFO:
+            self.logger.info(msg)
+        elif level == logging.WARNING:
+            self.logger.warning(msg)
+        elif level == logging.ERROR:
+            self.logger.error(msg)
 
     def cli_neutral(self, msg):
         self._cli_print(logging.DEBUG, "reset", msg)

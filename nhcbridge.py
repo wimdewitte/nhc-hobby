@@ -25,7 +25,7 @@ class AppFailed(Exception):
 
 def configure_options():
     parser = ArgumentParser(description="NHC Hass bridge")
-    parser.add_argument('-l', '--loglevel', help='Loglevel: 1=Error, 2=Warning, 3=Info, 4=Debug', default=1, required=False)
+    parser.add_argument('-l', '--loglevel', help='Loglevel: d(ebug), i(nfo), w(arning), e(rror)', default="e", required=False)
     parser.add_argument('-c', '--config', help='Config file location', required=True, default="./nhc.yaml")
     parser.add_argument('-f', '--foreground', help='Run in foreground', default=False, action='store_true')
     parser.add_argument('-a', '--action', help='Action (start,stop,pid)', default="start", required=False)

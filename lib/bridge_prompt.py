@@ -24,6 +24,14 @@ class prompt(cli.Cmd):
             self.clilogger.cli_info("set {} successfully".format(actiontype))
 
     @cli.with_argument_list
+    @cli.with_category("miscellaneous")
+    def do_loglevel(self, args):
+        self.clilogger.set_loglevel(args)
+ 
+    def help_loglevel(self):
+        self.clilogger.cli_neutral("Change the loglevel. arg1: d=debug, i=info, w=warning, e=error")
+
+    @cli.with_argument_list
     @cli.with_category("NHC")
     def do_devices(self, args):
         if len(args) == 0:
