@@ -442,6 +442,39 @@ class hobbyAPI(object):
         return self.print_devices(filtermodel=self.motor_models, filtertype="action")
 
 
+    def print_properties(self, uuid):
+        try:
+            UUID(uuid)
+        except ValueError:
+            return None
+        _uuid = None
+        i = 0
+        while i < len(self.devices):
+            _device = self.devices[i]
+            _name = _device["Name"]
+            _model = _device["Model"]
+            _type = _device["Type"]
+            _uuid = _device["Uuid"]
+            if uuid == _uuid:
+                break
+            i += 1
+
+        if _uuid is None:
+            self.logger.warning("uuid not found")
+            return
+
+        t = PrettyTable()
+        t.field_names = ["Property", "Value"]
+        t.align = "l"
+        i = 0
+        while i < len(_device["Properties"]):
+            _properties = _device["Properties"][i]
+            for key, value in _properties.items():
+                t.add_row([key, value])
+            i += 1
+        return str(t.get_string(sortby="Property"))
+
+
     def search_uuid_action(self, uuid, nhcmodel):
         try:
             UUID(uuid)
@@ -477,6 +510,7 @@ class hobbyAPI(object):
         if not found:
             self.logger.warning("uuid not found")
         return found
+        
 
     def locations_list_get(self):
         if not self.connected:

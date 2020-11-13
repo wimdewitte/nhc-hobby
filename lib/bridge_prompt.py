@@ -38,6 +38,15 @@ class prompt(cli.Cmd):
             filtermodel=args.model, filtertype=args.type, fulltable=args.full)
         self.clilogger.cli_info(_table)
 
+    properties_parser = argparse.ArgumentParser()
+    properties_parser.add_argument('-u', '--uuid', help='NHC UUID device', required=True)
+
+    @cli.with_argparser(properties_parser)
+    @cli.with_category("NHC")
+    def do_properties(self, args):
+        _table = self.nhccontrol.hobby.print_properties(args.uuid)
+        self.clilogger.cli_info(_table)
+
     mood_parser = argparse.ArgumentParser()
     mood_parser.add_argument('-u', '--uuid', help='NHC UUID device')
     mood_parser.add_argument('-p', '--print', help='Print table with moods', action='store_true')
