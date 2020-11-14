@@ -6,6 +6,9 @@ import socket
 from nhc.hobby_api import NHC_MODELS
 from hass.light import HassLight
 from hass.switch import HassSwitch
+from hass.cover import HassCover
+from hass.fan import HassFan
+from hass.device_trigger import HassDeviceTrigger
 
 TOPIC_HA_SET = "homeassistant/+/+/set"
 TOPIC_HA_START = "homeassistant/start"
@@ -76,6 +79,9 @@ class Hass(object):
         self.logger.info("Connected to mesh broker. rc:%d", rc)
         self.light = HassLight(self.logger, self.client, self.hobby)
         self.switch = HassSwitch(self.logger, self.client, self.hobby)
+        self.cover = HassCover(self.logger, self.client, self.hobby)
+        self.fan = HassFan(self.logger, self.client, self.hobby)
+        self.device_trigger = HassDeviceTrigger(self.logger, self.client, self.hobby)
         self.client.subscribe(TOPIC_HA_SET, 0)
         self.client.subscribe(TOPIC_HA_START, 0)
         self.client.subscribe(TOPIC_HA_STOP, 0)
@@ -105,6 +111,12 @@ class Hass(object):
             self.light.set(uuid, msg.payload)
         elif hass_type == "switch":
             self.switch.set(uuid, msg.payload)
+        elif hass_type == "cover":
+            self.cover.set(uuid, msg.payload)
+        elif hass_type == "fan":
+            self.fan.set(uuid, msg.payload)
+        elif hass_type == "device_trigger":
+            self.device_trigger.set(uuid, msg.payload)
 
 
     def nhc_to_hass_model(self, nhc_model):
@@ -116,9 +128,7 @@ class Hass(object):
             return "fan"
         elif nhc_model in ["socket", "switched-generic"]:
             return "switch"
-        elif nhc_model in ["pir", "alarms"]:
-            return "binary_sensor"
-        elif nhc_model in ["comfort", "condition", "alloff", "generic", "timeschedule"]:
+        elif nhc_model in ["alloff", "pir", "alarms", "comfort", "condition", "generic", "timeschedule"]:
             self.logger.info("NHC model '%s' not supported in Hass", nhc_model)
             return None
 
@@ -146,6 +156,12 @@ class Hass(object):
             self.light.discover(device, hass_name)
         elif hass_model == "switch":
             self.switch.discover(device, hass_name)
+        elif hass_model == "cover":
+            self.cover.discover(device, hass_name)
+        elif hass_model == "fan":
+            self.fan.discover(device, hass_name)
+        elif hass_model == "device_trigger":
+            self.device_trigger.discover(device, hass_name)
 
 
     def nhc_status_update(self, device, frame):
@@ -155,5 +171,9 @@ class Hass(object):
         uuid = device["Uuid"]
         if hass_model == "light":
             self.light.update(uuid, frame["Properties"])
-        if hass_model == "switch":
+        elif hass_model == "switch":
             self.switch.update(uuid, frame["Properties"])
+        elif hass_model == "cover":
+            self.cover.update(uuid, frame["Properties"])
+        elif hass_model == "fan":
+            self.fan.update(uuid, frame["Properties"])

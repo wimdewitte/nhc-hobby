@@ -1,6 +1,6 @@
 import json
 
-class HassSwitch(object):
+class HassFan(object):
     def __init__(self, logger, hass, hobby):
         self.logger = logger
         self.hass = hass
@@ -8,7 +8,7 @@ class HassSwitch(object):
 
     def discover(self, device, name):
         uuid = device["Uuid"]
-        main_topic = "homeassistant/switch/" + uuid
+        main_topic = "homeassistant/fan/" + uuid
         config_topic = main_topic + "/config"
         payload = {}
         payload["name"] = name
@@ -28,7 +28,7 @@ class HassSwitch(object):
                 status = _value.upper()
                 break
             i += 1
-        topic = "homeassistant/switch/" + uuid + "/state"
+        topic = "homeassistant/fan/" + uuid + "/state"
         self.hass.publish(topic, status)
 
     def set(self, uuid, payload):
