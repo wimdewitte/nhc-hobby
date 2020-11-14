@@ -28,6 +28,8 @@ class HassSwitch(object):
                 status = _value.upper()
                 break
             i += 1
+        if status is None:
+            return
         topic = "homeassistant/switch/" + uuid + "/state"
         self.hass.publish(topic, status)
 

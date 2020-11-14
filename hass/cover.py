@@ -48,6 +48,8 @@ class HassCover(object):
                 state = "CLOSING"
             if state == "CLOSE" and moving:
                 state = "OPENING"
+        if state is None:
+            return
         topic = "homeassistant/cover/" + uuid + "/state"
         self.hass.publish(topic, state)
 

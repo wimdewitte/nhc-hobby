@@ -77,7 +77,9 @@ class hobbyAPI(object):
         self.systeminfo = None
         self.devices = None
         self.locations = None
-        self.device_callback = None
+        self.device_update_callback = None
+        self.device_remove_callback = None
+        self.device_add_callback = None
         self.nhc_models = ["relay", "dimmer", "motor", "mood"]
         self.relay_models = ["light", "socket", "switched-fan", "switched-generic"]
         self.dimmer_models = ["dimmer"]
@@ -101,8 +103,10 @@ class hobbyAPI(object):
                 return
             pass
 
-    def set_callbacks(self, device_callback):
-        self.device_callback = device_callback
+    def set_callbacks(self, device_update_callback, device_remove_callback, device_add_callback):
+        self.device_update_callback = device_update_callback
+        self.device_remove_callback = device_remove_callback
+        self.device_add_callback = device_add_callback
 
     def _connect_timeout_handler(self):
         if self.connected:
@@ -294,8 +298,8 @@ class hobbyAPI(object):
 
         self.logger.info("device '%s' status changed: %s", name, frame)
         
-        if self.device_callback is not None and call_callback:
-            self.device_callback(self.devices[device_index], frame)
+        if self.device_update_callback is not None and call_callback:
+            self.device_update_callback(self.devices[device_index], frame)
 
 
     def _message_devices_event(self, client, msg):
@@ -322,6 +326,8 @@ class hobbyAPI(object):
                 if _new:
                     self.devices.append(devices_in[dev_index])
                     self._extra_traits_in_name(dev_index)
+                    if self.device_add_callback is not None:
+                        self.device_add_callback(devices_in[dev_index])
                     self.logger.info("device '%s' (%s/%s) added", _name, _model, _type)
             return
         # handle the rest of the methods
@@ -340,6 +346,8 @@ class hobbyAPI(object):
                     _type = self.devices[i]["Type"]
                     if method == "devices.removed":
                         self.logger.info("device '%s' (%s/%s) removed", _name, _model, _type)
+                        if self.device_remove_callback is not None:
+                            self.device_remove_callback(uuid, _model)
                         del self.devices[i]
                     elif method == "devices.displayname_changed":
                         new_name = devices_in[dev_index]["DisplayName"]

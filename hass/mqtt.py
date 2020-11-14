@@ -138,30 +138,11 @@ class Hass(object):
         if exist is None:
             self.logger.info("uuid not found")
             return False
-        
         device = self.hobby.get_device(uuid)
-        location = device["Parameters"][0]["LocationName"]
-        hass_name = device["Name"]
-        if hass_name.find(location) == -1:
-            hass_name = hass_name + " " + location
-        hass_model = self.nhc_to_hass_model(device["Model"])
-        if hass_model is None:
-            return False
         if remove:
-            topic = "homeassistant/" + hass_model + "/" + uuid + "/config"
-            self.client.publish(topic, '')
-            return True
-
-        if hass_model == "light":
-            self.light.discover(device, hass_name)
-        elif hass_model == "switch":
-            self.switch.discover(device, hass_name)
-        elif hass_model == "cover":
-            self.cover.discover(device, hass_name)
-        elif hass_model == "fan":
-            self.fan.discover(device, hass_name)
-        elif hass_model == "device_trigger":
-            self.device_trigger.discover(device, hass_name)
+            self.nhc_remove_device(uuid, device["Model"])
+        else:
+            self.nhc_add_device(device)
 
 
     def nhc_status_update(self, device, frame):
@@ -177,3 +158,29 @@ class Hass(object):
             self.cover.update(uuid, frame["Properties"])
         elif hass_model == "fan":
             self.fan.update(uuid, frame["Properties"])
+
+
+    def nhc_remove_device(self, uuid, model):
+        hass_model = self.nhc_to_hass_model(model)
+        topic = "homeassistant/" + hass_model + "/" + uuid + "/config"
+        self.client.publish(topic, '')
+
+
+    def nhc_add_device(self, device):
+        location = device["Parameters"][0]["LocationName"]
+        hass_name = device["Name"]
+        if hass_name.find(location) == -1:
+            hass_name = hass_name + " " + location
+        hass_model = self.nhc_to_hass_model(device["Model"])
+        if hass_model is None:
+            return False
+        if hass_model == "light":
+            self.light.discover(device, hass_name)
+        elif hass_model == "switch":
+            self.switch.discover(device, hass_name)
+        elif hass_model == "cover":
+            self.cover.discover(device, hass_name)
+        elif hass_model == "fan":
+            self.fan.discover(device, hass_name)
+        elif hass_model == "device_trigger":
+            self.device_trigger.discover(device, hass_name)

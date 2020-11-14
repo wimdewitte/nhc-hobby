@@ -59,7 +59,7 @@ class Daemon():
                 self.hass = Hass(self.logger, hobby=self.hobby)
                 self.hobby.start()
                 self.hass.start()
-                self.hobby.set_callbacks(self.hass.nhc_status_update)
+                self.hobby.set_callbacks(self.hass.nhc_status_update, self.hass.nhc_remove_device, self.hass.nhc_add_device)
 
                 # give some time to connect
                 time.sleep(3)

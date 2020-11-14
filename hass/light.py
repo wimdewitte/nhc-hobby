@@ -35,6 +35,8 @@ class HassLight(object):
             elif _property == "Brightness":
                 brightness = int(_value)
             i += 1
+        if status is None and brightness is None:
+            return
         topic = "homeassistant/light/" + uuid + "/state"
         frame = {}
         frame["state"] = status
