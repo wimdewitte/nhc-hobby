@@ -27,6 +27,7 @@ class prompt(cli.Cmd):
     devices_parser = argparse.ArgumentParser()
     devices_parser.add_argument('-m', '--model', help='Filter NHC model')
     devices_parser.add_argument('-t', '--type', help='Filter NHC type')
+    devices_parser.add_argument('-s', '--sort', help='Sort by', choices=['Name','Location','Model','Type','UUID'], default="Name")
     devices_parser.add_argument('-f', '--full', help='Print full table', action='store_true', default=False)
 
     @cli.with_argparser(devices_parser)
@@ -35,7 +36,7 @@ class prompt(cli.Cmd):
         if args.model is not None:
             args.model = [args.model]
         _table = self.nhccontrol.hobby.print_devices(
-            filtermodel=args.model, filtertype=args.type, fulltable=args.full)
+            filtermodel=args.model, filtertype=args.type, fulltable=args.full, sortby=args.sort)
         self.clilogger.cli_info(_table)
 
     properties_parser = argparse.ArgumentParser()
@@ -49,13 +50,13 @@ class prompt(cli.Cmd):
 
     mood_parser = argparse.ArgumentParser()
     mood_parser.add_argument('-u', '--uuid', help='NHC UUID device')
-    mood_parser.add_argument('-p', '--print', help='Print table with moods', action='store_true')
+    mood_parser.add_argument('-v', '--view', help='View table with NHC mood-ish actions', action='store_true')
 
     @cli.with_argparser(mood_parser)
     @cli.with_category("NHC")
     def do_mood(self, args):
-        if args.print:
-            _table = self.nhccontrol.hobby.print_mood_action()
+        if args.view:
+            _table = self.nhccontrol.hobby.print_devices(filtermodel=self.nhccontrol.hobby.mood_models, filtertype="action")
             self.clilogger.cli_info(_table)
         if args.uuid is not None:
             self.nhccontrol.mood(args.uuid)
@@ -69,7 +70,7 @@ class prompt(cli.Cmd):
     @cli.with_category("NHC")
     def do_relay(self, args):
         if args.view:
-            _table = self.nhccontrol.hobby.print_relay_action()
+            _table = self.nhccontrol.hobby.print_devices(filtermodel=self.nhccontrol.hobby.relay_models, filtertype="action")
             self.clilogger.cli_info(_table)
         if args.uuid is not None:
             self.nhccontrol.relay(args.uuid, args.status)
@@ -84,7 +85,7 @@ class prompt(cli.Cmd):
     @cli.with_category("NHC")
     def do_dimmer(self, args):
         if args.view:
-            _table = self.nhccontrol.hobby.print_dimmer_action()
+            _table = self.nhccontrol.hobby.print_devices(filtermodel=self.nhccontrol.hobby.dimmer_models, filtertype="action")
             self.clilogger.cli_info(_table)
         if args.uuid is not None:
             self.nhccontrol.dimmer(args.uuid, args.status, args.brightness)
@@ -99,7 +100,7 @@ class prompt(cli.Cmd):
     @cli.with_category("NHC")
     def do_motor(self, args):
         if args.view:
-            _table = self.nhccontrol.hobby.print_motor_action()
+            _table = self.nhccontrol.hobby.print_devices(filtermodel=self.nhccontrol.hobby.motor_models, filtertype="action")
             self.clilogger.cli_info(_table)
         if args.uuid is not None:
             self.nhccontrol.motor(args.uuid, args.action, args.position)

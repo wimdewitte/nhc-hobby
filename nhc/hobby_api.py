@@ -371,7 +371,7 @@ class hobbyAPI(object):
             self.logger.info("no device (uuid:%s) found for action '%s'", uuid, method)  
 
 
-    def print_devices(self, filtermodel=None, filtertype=None, fulltable=False):
+    def print_devices(self, filtermodel=None, filtertype=None, fulltable=False, sortby="Name"):
         if self.devices is None:
             self.logger.warn("no NHC devices found")
             return
@@ -435,7 +435,7 @@ class hobbyAPI(object):
                 else:
                     t.add_row([_name, _location, _model, _type, _uuid])
             i += 1
-        return str(t.get_string(sortby="Name"))
+        return str(t.get_string(sortby=sortby))
 
     def print_mood_action(self):
         return self.print_devices(filtermodel=self.mood_models, filtertype="action")
@@ -497,7 +497,7 @@ class hobbyAPI(object):
         elif nhcmodel == NHC_MODELS.MOTOR:
             models = self.motor_models
         else:
-            models = self.relay_models + self.dimmer_models + self.motor_models
+            models = self.relay_models + self.dimmer_models + self.motor_models + self.mood_models
         i = 0
         found = None
         while i < len(self.devices):

@@ -8,7 +8,7 @@ from hass.light import HassLight
 from hass.switch import HassSwitch
 from hass.cover import HassCover
 from hass.fan import HassFan
-from hass.device_trigger import HassDeviceTrigger
+from hass.binary_sensor import HassBinarySensor
 
 TOPIC_HA_SET = "homeassistant/+/+/set"
 TOPIC_HA_START = "homeassistant/start"
@@ -81,7 +81,7 @@ class Hass(object):
         self.switch = HassSwitch(self.logger, self.client, self.hobby)
         self.cover = HassCover(self.logger, self.client, self.hobby)
         self.fan = HassFan(self.logger, self.client, self.hobby)
-        self.device_trigger = HassDeviceTrigger(self.logger, self.client, self.hobby)
+        self.binary_sensor = HassBinarySensor(self.logger, self.client, self.hobby)
         self.client.subscribe(TOPIC_HA_SET, 0)
         self.client.subscribe(TOPIC_HA_START, 0)
         self.client.subscribe(TOPIC_HA_STOP, 0)
@@ -115,8 +115,8 @@ class Hass(object):
             self.cover.set(uuid, msg.payload)
         elif hass_type == "fan":
             self.fan.set(uuid, msg.payload)
-        elif hass_type == "device_trigger":
-            self.device_trigger.set(uuid, msg.payload)
+        elif hass_type == "binary_sensor":
+            self.binary_sensor.set(uuid, msg.payload)
 
 
     def nhc_to_hass_model(self, nhc_model):
@@ -128,7 +128,9 @@ class Hass(object):
             return "fan"
         elif nhc_model in ["socket", "switched-generic"]:
             return "switch"
-        elif nhc_model in ["alloff", "pir", "alarms", "comfort", "condition", "generic", "timeschedule"]:
+        elif nhc_model in ["comfort", "alloff", "generic"]:
+            return "binary_sensor"
+        elif nhc_model in ["pir", "alarms", "condition", "timeschedule"]:
             self.logger.info("NHC model '%s' not supported in Hass", nhc_model)
             return None
 
@@ -182,5 +184,5 @@ class Hass(object):
             self.cover.discover(device, hass_name)
         elif hass_model == "fan":
             self.fan.discover(device, hass_name)
-        elif hass_model == "device_trigger":
-            self.device_trigger.discover(device, hass_name)
+        elif hass_model == "binary_sensor":
+            self.binary_sensor.discover(device, hass_name)
