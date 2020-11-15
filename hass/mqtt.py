@@ -11,8 +11,7 @@ from hass.fan import HassFan
 from hass.binary_sensor import HassBinarySensor
 
 TOPIC_HA_SET = "homeassistant/+/+/set"
-TOPIC_HA_START = "homeassistant/start"
-TOPIC_HA_STOP = "homeassistant/stop"
+TOPIC_HA_STATUS = "homeassistant/status"
 
 
 class Hass(object):
@@ -63,10 +62,9 @@ class Hass(object):
     
 
     def message(self, client, obj, msg):
-        if msg.topic == TOPIC_HA_START:
-            self.hass_start()
-        elif msg.topic == TOPIC_HA_START:
-            self.hass_stop()
+        self.logger.info("HASS mqtt message topic:%s\n%s", msg.topic, json.loads(msg.payload))
+        if msg.topic == TOPIC_HA_STATUS:
+            self.hass_status(msg.payload)
         elif msg.topic.endswith("set"):
             self.hass_set(client, msg)
         else:
@@ -83,8 +81,7 @@ class Hass(object):
         self.fan = HassFan(self.logger, self.client, self.hobby)
         self.binary_sensor = HassBinarySensor(self.logger, self.client, self.hobby)
         self.client.subscribe(TOPIC_HA_SET, 0)
-        self.client.subscribe(TOPIC_HA_START, 0)
-        self.client.subscribe(TOPIC_HA_STOP, 0)
+        self.client.subscribe(TOPIC_HA_STATUS, 0)
 
 
     def disconnect(self, client, userdata, rc):
@@ -93,15 +90,16 @@ class Hass(object):
         self.connect_timer.cancel()
 
 
-    def hass_start(self):
-        self.hass_online = True
-        # pass all nhc states towards hass
+    def hass_status(self, payload):
+        if payload == "online":
+            self.hass_online = True
+            self.logger.warning("Home Assistant online")
+            # pass all nhc states towards hass
+        elif payload == "offline":
+            self.logger.warning("Home Assistant offline")
+            self.hass_online = False
         pass
 
-    def hass_stop(self):
-        self.hass_online = False
-        # do nothing
-        pass
 
     def hass_set(self, client, msg):
         topic_split = msg.topic.split("/")
@@ -168,21 +166,40 @@ class Hass(object):
         self.client.publish(topic, '')
 
 
-    def nhc_add_device(self, device):
+    def discover_frame(self, device):
         location = device["Parameters"][0]["LocationName"]
-        hass_name = device["Name"]
-        if hass_name.find(location) == -1:
-            hass_name = hass_name + " " + location
+        _hass_name = device["Name"]
+        if _hass_name.find(location) == -1:
+            _hass_name = _hass_name + " " + location
+        _gateway_info = self.hobby.nhc_info()
+        frame_device = {}
+        frame_device["name"] = "NHC"
+        frame_device["identifiers"] = [_gateway_info["gateway_name"]]
+        frame_device["manufacturer"] = "Niko"
+        frame_device["model"] = _gateway_info["hubtype"]
+        frame_device["sw_version"] = _gateway_info["firmware"]
+        frame = {}
+        frame["name"] = _hass_name
+        frame["unique_id"] = device["Uuid"]
+        frame["retain"] = True
+        frame["device"] = frame_device
+        frame["command_topic"] = "~/set"
+        frame["state_topic"] = "~/state"
+        return frame
+
+
+    def nhc_add_device(self, device):
         hass_model = self.nhc_to_hass_model(device["Model"])
         if hass_model is None:
             return False
+        _base_frame = self.discover_frame(device)
         if hass_model == "light":
-            self.light.discover(device, hass_name)
+            self.light.discover(device, _base_frame)
         elif hass_model == "switch":
-            self.switch.discover(device, hass_name)
+            self.switch.discover(device, _base_frame)
         elif hass_model == "cover":
-            self.cover.discover(device, hass_name)
+            self.cover.discover(device, _base_frame)
         elif hass_model == "fan":
-            self.fan.discover(device, hass_name)
+            self.fan.discover(device, _base_frame)
         elif hass_model == "binary_sensor":
-            self.binary_sensor.discover(device, hass_name)
+            self.binary_sensor.discover(device, _base_frame)

@@ -449,7 +449,6 @@ class hobbyAPI(object):
     def print_motor_action(self):
         return self.print_devices(filtermodel=self.motor_models, filtertype="action")
 
-
     def print_properties(self, uuid):
         try:
             UUID(uuid)
@@ -481,6 +480,25 @@ class hobbyAPI(object):
                 t.add_row([key, value])
             i += 1
         return str(t.get_string(sortby="Property"))
+
+
+    def nhc_info(self):
+        frame = {"ip": self.discover.gateway["ip"]}
+        i = 0
+        while i < len(self.devices):
+            if self.devices[i]["Model"] == "nhc" and self.devices[i]["Type"] == "home_automation":
+                frame["gateway_name"] = self.devices[i]["Name"]
+            if self.devices[i]["Name"] == "gatewayfw":
+                frame["hubtype"] = self.devices[i]["Traits"][0]["HubType"]
+                j = 0
+                while j < len(self.devices[i]["Properties"]):
+                    _property = self.devices[i]["Properties"][j]
+                    for key, value in _property.items():
+                        if key == "CurrentFWInfo":
+                            frame["firmware"] = value
+                    j += 1
+            i += 1
+        return frame
 
 
     def search_uuid_action(self, uuid, nhcmodel):

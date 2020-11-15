@@ -6,7 +6,7 @@ class HassCover(object):
         self.hass = hass
         self.hobby = hobby
 
-    def discover(self, device, name):
+    def discover(self, device, payload):
         uuid = device["Uuid"]
         if device["Model"] == "sunblind":
             _device_class = "awning"
@@ -15,15 +15,11 @@ class HassCover(object):
         elif device["Model"] == "venetianblind":
             _device_class = "blind"
         else:
-            _device_class = ""
+            _device_class = "shutter"
         main_topic = "homeassistant/cover/" + uuid
         config_topic = main_topic + "/config"
-        payload = {}
-        payload["name"] = name
-        payload["unique_id"] = uuid
+        payload["~"] = main_topic
         payload["device_class"] = _device_class
-        payload["command_topic"] = main_topic + "/set"
-        payload["state_topic"] = main_topic + "/state"
         payload["state_open"] = "OPEN"
         payload["state_opening"] = "OPENING"
         payload["state_closed"] = "CLOSE"

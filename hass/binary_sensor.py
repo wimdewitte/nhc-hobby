@@ -6,15 +6,14 @@ class HassBinarySensor(object):
         self.hass = hass
         self.hobby = hobby
 
-    def discover(self, device, name):
+    def discover(self, device, payload):
         uuid = device["Uuid"]
         main_topic = "homeassistant/binary_sensor/" + uuid
         config_topic = main_topic + "/config"
-        payload = {}
-        payload["name"] = name
-        payload["unique_id"] = uuid
-        payload["state_topic"] = main_topic + "/state"
+        payload["~"] = main_topic
         payload["off_delay"] = 10
+        del(payload["command_topic"]) # a binary_sensor doesn't have a command topic
+        del(payload["retain"])
         self.hass.publish(config_topic, json.dumps(payload))
 
     def update(self, uuid, properties):
@@ -33,4 +32,4 @@ class HassBinarySensor(object):
         self.hass.publish(topic, status)
 
     def set(self, uuid, payload):
-        pass # a binary_sensor doesn't have a set topic
+        pass # a binary_sensor doesn't have a command topic

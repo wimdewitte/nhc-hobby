@@ -6,15 +6,11 @@ class HassFan(object):
         self.hass = hass
         self.hobby = hobby
 
-    def discover(self, device, name):
+    def discover(self, device, payload):
         uuid = device["Uuid"]
         main_topic = "homeassistant/fan/" + uuid
         config_topic = main_topic + "/config"
-        payload = {}
-        payload["name"] = name
-        payload["unique_id"] = uuid
-        payload["command_topic"] = main_topic + "/set"
-        payload["state_topic"] = main_topic + "/state"
+        payload["~"] = main_topic
         self.hass.publish(config_topic, json.dumps(payload))
         self.update(uuid, device["Properties"])
 
