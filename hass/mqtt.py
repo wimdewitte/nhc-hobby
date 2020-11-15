@@ -10,9 +10,6 @@ from hass.cover import HassCover
 from hass.fan import HassFan
 from hass.binary_sensor import HassBinarySensor
 
-TOPIC_HA_SET = "homeassistant/+/+/set"
-TOPIC_HA_STATUS = "homeassistant/status"
-
 
 class Hass(object):
     def __init__(self, logger, hobby=None, host=None, port=1883, connect_timeout=60):
@@ -62,8 +59,8 @@ class Hass(object):
     
 
     def message(self, client, obj, msg):
-        self.logger.info("HASS mqtt message topic:%s\n%s", msg.topic, json.loads(msg.payload))
-        if msg.topic == TOPIC_HA_STATUS:
+        #self.logger.info("HASS mqtt message topic:%s\n%s", msg.topic, msg.payload)
+        if msg.topic.endswith("status"):
             self.hass_status(msg.payload)
         elif msg.topic.endswith("set"):
             self.hass_set(client, msg)
@@ -80,8 +77,7 @@ class Hass(object):
         self.cover = HassCover(self.logger, self.client, self.hobby)
         self.fan = HassFan(self.logger, self.client, self.hobby)
         self.binary_sensor = HassBinarySensor(self.logger, self.client, self.hobby)
-        self.client.subscribe(TOPIC_HA_SET, 0)
-        self.client.subscribe(TOPIC_HA_STATUS, 0)
+        self.client.subscribe("#", 0)
 
 
     def disconnect(self, client, userdata, rc):
@@ -91,6 +87,7 @@ class Hass(object):
 
 
     def hass_status(self, payload):
+        payload = payload.decode('ascii')
         if payload == "online":
             self.hass_online = True
             self.logger.warning("Home Assistant online")
