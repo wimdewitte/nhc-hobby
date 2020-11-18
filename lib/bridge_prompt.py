@@ -108,7 +108,6 @@ class prompt(cli.Cmd):
     discover_parser = argparse.ArgumentParser(description="Discover entities")
     discover_parser.add_argument('-u', '--uuid', help='NHC UUID device')
     discover_parser.add_argument('-v', '--view', help='View table with actions', action='store_true')
-    discover_parser.add_argument('-r', '--remove', help='Remove device', action='store_true', default=False)
     discover_parser.add_argument('-a', '--all', help='All NHC devices', action='store_true', default=False)
 
     @cli.with_argparser(discover_parser)
@@ -118,9 +117,24 @@ class prompt(cli.Cmd):
             _table = self.nhccontrol.hobby.print_devices(filtertype="action")
             self.clilogger.cli_info(_table)
         elif args.all:
-            self.hass.discover_all(args.remove)
+            self.hass.discover_all()
         elif args.uuid is not None:
-            self.hass.discover(args.uuid, args.remove)
+            self.hass.discover(args.uuid)
+
+
+    remove_parser = argparse.ArgumentParser(description="Remove an entity")
+    remove_parser.add_argument('-u', '--uuid', help='UUID device')
+    remove_parser.add_argument('-m', '--model', help='Hass model (if not in NHC database)', choices=['light', 'switch', 'cover', 'fan', 'binary_sensor'])
+    remove_parser.add_argument('-a', '--all', help='Remove all NHC devices', action='store_true', default=False)
+
+    @cli.with_argparser(remove_parser)
+    @cli.with_category("Hass")
+    def do_remove(self, args):
+        if args.all:
+            self.hass.remove_all()
+        elif args.uuid is not None:
+            self.hass.remove(args.uuid, args.model)
+
 
     availability_parser = argparse.ArgumentParser(description="Set entity availability")
     availability_parser.add_argument('-u', '--uuid', help='NHC UUID device')

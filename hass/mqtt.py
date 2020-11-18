@@ -138,22 +138,37 @@ class Hass(object):
             return None
 
 
-    def discover(self, uuid, remove=False):
+    def discover(self, uuid):
         device = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
         if device is None:
             self.logger.info("device not found")
             return False
-        if remove:
-            self.nhc_remove_device(device["Uuid"], device["Model"])
-        else:
-            self.nhc_add_device(device)
+        self.nhc_add_device(device)
 
 
-    def discover_all(self, remove=False):
+    # todo: ask fresh list from NHC
+    def discover_all(self):
         _list = self.hobby.list_uuid_action()
         for uuid in _list:
             time.sleep(0.1)
-            self.discover(uuid, remove)
+            self.discover(uuid)
+
+
+    def remove(self, uuid, model):
+        device = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
+        if device is not None:
+            model = self.nhc_to_hass_model(device["Model"])
+        if model is None:
+            return
+        topic = "homeassistant/" + model + "/" + uuid + "/config"
+        self.client.publish(topic, '')
+
+
+    def remove_all(self):
+        _list = self.hobby.list_uuid_action()
+        for uuid in _list:
+            time.sleep(0.1)
+            self.remove(uuid, None)
 
 
     def nhc_status_update(self, device, frame):
@@ -232,7 +247,7 @@ class Hass(object):
         hass_model = self.nhc_to_hass_model(device["Model"])
         if hass_model == "light":
             self.light.availability(device["Uuid"], mode)
-        elif hass_model == "switch":
+        elif hass_model == "switch" and "switch_mood":
             self.switch.availability(device["Uuid"], mode)
         elif hass_model == "cover":
             self.cover.availability(device["Uuid"], mode)
