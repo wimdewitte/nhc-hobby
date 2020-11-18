@@ -29,7 +29,7 @@ class Application():
     def run(self, foreground=False):
         while True:
             try:
-                self.logger.info("NHC Bridge started")
+                self.logger.info("NHC Hass Bridge started")
                 self.hobby = hobbyAPI(self.logger, self.configfile)
                 self.nhccontrol = controlNHC(self.hobby)
                 self.hass = Hass(self.logger, hobby=self.hobby)
@@ -77,13 +77,13 @@ class Application():
 
 class CreateApp(object):
     def __init__(self, options):
-        self.clilogger = mylogger("nhcbridge", options.loglevel)
+        self.clilogger = mylogger("nhchabridge", options.loglevel)
         self.logger = self.clilogger.get_logger()
         self.options = options
         if os.access("/var/run/", os.W_OK):
-            _pidfile = "/var/run/nhcbridge.pid"
+            _pidfile = "/var/run/nhchabridge.pid"
         else:
-            _pidfile = "/var/tmp/nhcbridge.pid"
+            _pidfile = "/var/tmp/nhchabridge.pid"
         self.pid_file = PIDLockFile(_pidfile)
 
     def stop_daemon(self):
