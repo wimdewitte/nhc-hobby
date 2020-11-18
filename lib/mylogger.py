@@ -8,7 +8,7 @@ LOG_FORMAT = "%(asctime)s.%(msecs)03d - %(levelname)s: %(message)s"
 class mylogger(object):
     def __init__(self, name, loglevel):
         self.logger = logging.getLogger(name)
-        self.set_loglevel('i')
+        self.set_loglevel(loglevel)
 
 
     def set_loglevel(self, level):
@@ -20,9 +20,7 @@ class mylogger(object):
             self._loglevel = logging.WARNING
         else:
             self._loglevel = logging.ERROR
-
         self.logger.setLevel(self._loglevel)
-        self.cli_info("loglevel {}".format(logging._levelToName[self._loglevel]))
 
 
     def set_logger_stream(self):
