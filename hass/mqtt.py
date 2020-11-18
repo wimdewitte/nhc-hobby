@@ -3,9 +3,10 @@ import threading
 import json
 import logging
 import socket
+import time
 from nhc.hobby_api import NHC_MODELS
 from hass.light import HassLight
-from hass.switch import HassSwitch
+from hass.switch import HassSwitch, HassSwitchMood
 from hass.cover import HassCover
 from hass.fan import HassFan
 from hass.binary_sensor import HassBinarySensor
@@ -29,7 +30,7 @@ class Hass(object):
     def _connect_timeout_handler(self):
         if self.connected:
             return
-        self.logger.info("Cannot connect to mesh broker")
+        self.logger.info("Cannot connect to hass broker")
         self.connected = False
         self.client.disconnect()
 
@@ -60,20 +61,24 @@ class Hass(object):
 
     def message(self, client, obj, msg):
         #self.logger.info("HASS mqtt message topic:%s\n%s", msg.topic, msg.payload)
-        if msg.topic.endswith("status"):
+        if msg.topic == "homeassistant/status":
             self.hass_status(msg.payload)
         elif msg.topic.endswith("set"):
             self.hass_set(client, msg)
+        elif msg.topic.endswith("state") or msg.topic.endswith("available"):
+            # skip messages send ourself towards hass
+            pass
         else:
-            self.logger.info("mesh mqtt message '%s' on topic: %s", msg.payload, msg.topic)
+            self.logger.info("hass mqtt message '%s' on topic: %s", msg.payload, msg.topic)
 
 
     def connect(self, client, obj, flags, rc):
         self.connected = True
         self.connect_timer.cancel()
-        self.logger.info("Connected to mesh broker. rc:%d", rc)
+        self.logger.info("Connected to hass broker. rc:%d", rc)
         self.light = HassLight(self.logger, self.client, self.hobby)
         self.switch = HassSwitch(self.logger, self.client, self.hobby)
+        self.switch_mood = HassSwitchMood(self.logger, self.client, self.hobby)
         self.cover = HassCover(self.logger, self.client, self.hobby)
         self.fan = HassFan(self.logger, self.client, self.hobby)
         self.binary_sensor = HassBinarySensor(self.logger, self.client, self.hobby)
@@ -81,7 +86,7 @@ class Hass(object):
 
 
     def disconnect(self, client, userdata, rc):
-        self.logger.warning("Disconnected from mesh broker")
+        self.logger.warning("Disconnected from hass broker")
         self.connected = False
         self.connect_timer.cancel()
 
@@ -91,9 +96,12 @@ class Hass(object):
         if payload == "online":
             self.hass_online = True
             self.logger.warning("Home Assistant online")
-            # pass all nhc states towards hass
+            self.discover_all()
+            # todo pass all nhc states towards hass
         elif payload == "offline":
             self.logger.warning("Home Assistant offline")
+            # set all entities available, retained, so that this data is present when HA needs it
+            #self.set_all_available()
             self.hass_online = False
         pass
 
@@ -104,7 +112,7 @@ class Hass(object):
         uuid = topic_split[2]
         if hass_type == "light":
             self.light.set(uuid, msg.payload)
-        elif hass_type == "switch":
+        elif hass_type == "switch" or hass_type == "switch_mood":
             self.switch.set(uuid, msg.payload)
         elif hass_type == "cover":
             self.cover.set(uuid, msg.payload)
@@ -123,23 +131,29 @@ class Hass(object):
             return "fan"
         elif nhc_model in ["socket", "switched-generic"]:
             return "switch"
-        elif nhc_model in ["comfort", "alloff", "generic"]:
-            return "binary_sensor"
-        elif nhc_model in ["pir", "alarms", "condition", "timeschedule"]:
+        elif nhc_model in ["pir", "comfort", "overallcomfort", "alloff", "generic"]:
+            return "switch_mood"
+        elif nhc_model in ["alarms", "simulation"]:
             self.logger.info("NHC model '%s' not supported in Hass", nhc_model)
             return None
 
 
     def discover(self, uuid, remove=False):
-        exist = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
-        if exist is None:
-            self.logger.info("uuid not found")
+        device = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
+        if device is None:
+            self.logger.info("device not found")
             return False
-        device = self.hobby.get_device(uuid)
         if remove:
-            self.nhc_remove_device(uuid, device["Model"])
+            self.nhc_remove_device(device["Uuid"], device["Model"])
         else:
             self.nhc_add_device(device)
+
+
+    def discover_all(self, remove=False):
+        _list = self.hobby.list_uuid_action()
+        for uuid in _list:
+            time.sleep(0.1)
+            self.discover(uuid, remove)
 
 
     def nhc_status_update(self, device, frame):
@@ -151,6 +165,8 @@ class Hass(object):
             self.light.update(uuid, frame["Properties"])
         elif hass_model == "switch":
             self.switch.update(uuid, frame["Properties"])
+        elif hass_model == "switch_mood":
+            self.switch_mood.update(uuid, frame["Properties"])
         elif hass_model == "cover":
             self.cover.update(uuid, frame["Properties"])
         elif hass_model == "fan":
@@ -178,10 +194,10 @@ class Hass(object):
         frame = {}
         frame["name"] = _hass_name
         frame["unique_id"] = device["Uuid"]
-        frame["retain"] = True
         frame["device"] = frame_device
         frame["command_topic"] = "~/set"
         frame["state_topic"] = "~/state"
+        frame["availability_topic"] = "~/available"
         return frame
 
 
@@ -194,9 +210,40 @@ class Hass(object):
             self.light.discover(device, _base_frame)
         elif hass_model == "switch":
             self.switch.discover(device, _base_frame)
+        elif hass_model == "switch_mood":
+            self.switch_mood.discover(device, _base_frame)
         elif hass_model == "cover":
             self.cover.discover(device, _base_frame)
         elif hass_model == "fan":
             self.fan.discover(device, _base_frame)
         elif hass_model == "binary_sensor":
             self.binary_sensor.discover(device, _base_frame)
+
+
+    def availability(self, uuid, mode=True):
+        device = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
+        if device is None:
+            self.logger.info("device not found")
+            return False
+        if mode:
+            mode = "online"
+        else:
+            mode = "offline"
+        hass_model = self.nhc_to_hass_model(device["Model"])
+        if hass_model == "light":
+            self.light.availability(device["Uuid"], mode)
+        elif hass_model == "switch":
+            self.switch.availability(device["Uuid"], mode)
+        elif hass_model == "cover":
+            self.cover.availability(device["Uuid"], mode)
+        elif hass_model == "fan":
+            self.fan.availability(device["Uuid"], mode)
+        elif hass_model == "binary_sensor":
+            self.binary_sensor.availability(device["Uuid"], mode)
+
+
+    def set_all_available(self):
+        _list = self.hobby.list_uuid_action()
+        for uuid in _list:
+            time.sleep(0.1)
+            self.availability(uuid)

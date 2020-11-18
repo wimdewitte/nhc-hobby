@@ -517,7 +517,6 @@ class hobbyAPI(object):
         else:
             models = self.relay_models + self.dimmer_models + self.motor_models + self.mood_models
         i = 0
-        found = None
         while i < len(self.devices):
             _device = self.devices[i]
             _name = _device["Name"]
@@ -527,16 +526,26 @@ class hobbyAPI(object):
             if _type == "action":
                 for model in models:
                     if uuid == _uuid and model == _model:
-                        found = uuid
-                        break
-            if found is not None:
-                break
+                        return _device
             i += 1
-
-        if not found:
-            self.logger.warning("uuid not found")
-        return found
+        self.logger.warning("uuid not found")
+        return None
         
+
+    def list_uuid_action(self):
+        _list = []
+        models = self.relay_models + self.dimmer_models + self.motor_models + self.mood_models
+        i = 0
+        while i < len(self.devices):
+            _device = self.devices[i]
+            _model = _device["Model"]
+            _type = _device["Type"]
+            _uuid = _device["Uuid"]
+            if _type == "action" and _model in models:
+                _list.append(_uuid)
+            i += 1
+        return _list
+
 
     def locations_list_get(self):
         if not self.connected:

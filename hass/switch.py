@@ -13,6 +13,7 @@ class HassSwitch(object):
         payload["~"] = main_topic
         self.hass.publish(config_topic, json.dumps(payload))
         self.update(uuid, device["Properties"])
+        self.availability(uuid)
 
     def update(self, uuid, properties):
         status = None
@@ -20,7 +21,7 @@ class HassSwitch(object):
         while i < len(properties):
             _property = list(properties[i].keys())[0]
             _value = list(properties[i].values())[0]
-            if _property == "Status":
+            if _property == "Status" or _property == "BasicState":
                 status = _value.upper()
                 break
             i += 1
@@ -31,4 +32,36 @@ class HassSwitch(object):
 
     def set(self, uuid, payload):
         state = payload.decode('ascii').capitalize()
-        self.hobby.devices_control(uuid, "Status", state)
+        if state == "Triggered":
+            self.hobby.devices_control(uuid, "BasicState", state)
+        elif state == "On" or state == "Off":
+            self.hobby.devices_control(uuid, "Status", state)
+
+    def availability(self, uuid, mode="online"):
+        topic = "homeassistant/switch/" + uuid + "/available"
+        self.hass.publish(topic, mode, retain=True)
+
+
+class HassSwitchMood(HassSwitch):
+    def discover(self, device, payload):
+        payload["payload_off"] = "NA"
+        payload["payload_on"] = "Triggered"
+        payload["state_off"] = "OFF"
+        payload["state_on"] = "ON"
+        if device["Model"] == "comfort":
+            # NHC mood/scene
+            payload["icon"] = "mdi:home-heart"
+        if device["Model"] == "overallcomfort":
+            # NHC house status actions
+            payload["icon"] = "mdi:home-circle"
+        if device["Model"] == "alloff":
+            # NHC All-off action and All-off with walkway assistance
+            payload["icon"] = "mdi:home-export-outline"
+        if device["Model"] == "generic":
+            # NHC Free Start stop action
+            payload["icon"] = "mdi:home-automation"
+        if device["Model"] == "pir":
+            # NHC motion detection
+            payload["icon"] = "mdi:home-account"
+        super().discover(device, payload)
+

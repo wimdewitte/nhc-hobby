@@ -13,6 +13,7 @@ class HassFan(object):
         payload["~"] = main_topic
         self.hass.publish(config_topic, json.dumps(payload))
         self.update(uuid, device["Properties"])
+        self.availability(uuid)
 
     def update(self, uuid, properties):
         status = None
@@ -32,3 +33,7 @@ class HassFan(object):
     def set(self, uuid, payload):
         state = payload.decode('ascii').capitalize()
         self.hobby.devices_control(uuid, "Status", state)
+
+    def availability(self, uuid, mode="online"):
+        topic = "homeassistant/fan/" + uuid + "/available"
+        self.hass.publish(topic, mode, retain=True)

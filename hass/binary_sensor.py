@@ -13,8 +13,8 @@ class HassBinarySensor(object):
         payload["~"] = main_topic
         payload["off_delay"] = 10
         del(payload["command_topic"]) # a binary_sensor doesn't have a command topic
-        del(payload["retain"])
         self.hass.publish(config_topic, json.dumps(payload))
+        self.availability(uuid)
 
     def update(self, uuid, properties):
         status = None
@@ -33,3 +33,7 @@ class HassBinarySensor(object):
 
     def set(self, uuid, payload):
         pass # a binary_sensor doesn't have a command topic
+
+    def availability(self, uuid, mode="online"):
+        topic = "homeassistant/binary_sensor/" + uuid + "/available"
+        self.hass.publish(topic, mode, retain=True)

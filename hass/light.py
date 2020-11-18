@@ -18,6 +18,7 @@ class HassLight(object):
             payload["brightness"] = False
         self.hass.publish(config_topic, json.dumps(payload))
         self.update(uuid, device["Properties"])
+        self.availability(uuid)
 
     def update(self, uuid, properties):
         status = None
@@ -50,3 +51,7 @@ class HassLight(object):
         except:
             brightness = None
         self.hobby.devices_control(uuid, "Status", state, "Brightness", brightness)
+
+    def availability(self, uuid, mode="online"):
+        topic = "homeassistant/light/" + uuid + "/available"
+        self.hass.publish(topic, mode, retain=True)
