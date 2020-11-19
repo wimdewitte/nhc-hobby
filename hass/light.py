@@ -50,7 +50,7 @@ class HassLight(object):
             brightness = int(brightness/2.55)
         except:
             brightness = None
-        self.hobby.devices_control(uuid, "Status", state, "Brightness", brightness)
+        self.hobby.devices_control(uuid, "Status", state, "Brightness", str(brightness))
 
     def availability(self, uuid, mode="online"):
         topic = "homeassistant/light/" + uuid + "/available"
