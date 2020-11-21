@@ -13,7 +13,7 @@
             "args": [
                 "-l=d",
                 "-f",
-                "-c=/home/wdw/develop-wim/nhc-hobby/nhc.yaml"
+                "-n=/home/wdw/develop-wim/nhc-hobby/nhc.yaml"
             ],
         }
     ]

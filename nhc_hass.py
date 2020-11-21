@@ -18,8 +18,8 @@ from subprocess import PIPE, run
 
 
 class Application():
-    def __init__(self, configfile, clilogger):
-        self.configfile = configfile
+    def __init__(self, options, clilogger):
+        self.nhcconfig = options.nhcconfig
         self.clilogger = clilogger
         self.logger = clilogger.get_logger()
         self.hobby = None
@@ -30,7 +30,7 @@ class Application():
         while True:
             try:
                 self.logger.info("NHC Hass Bridge started")
-                self.hobby = hobbyAPI(self.logger, self.configfile)
+                self.hobby = hobbyAPI(self.logger, self.nhcconfig)
                 self.nhccontrol = controlNHC(self.hobby)
                 self.hass = Hass(self.logger, hobby=self.hobby)
                 self.hobby.start()
@@ -93,7 +93,7 @@ class CreateApp(object):
 
     def start_foreground(self):
         self.clilogger.set_logger_stream()
-        daemon = Application(self.options.config, self.clilogger)
+        daemon = Application(self.options, self.clilogger)
         try:
             daemon.run(foreground=True)
         except (SystemExit, KeyboardInterrupt):
@@ -104,7 +104,7 @@ class CreateApp(object):
         if self.pid_file.is_locked():
             self.logger.error("Service already running with pid %d", self.pid_file.read_pid())
             return
-        daemon = Application(self.options.config, self.clilogger)
+        daemon = Application(self.options, self.clilogger)
         context = DaemonContext()
         context.pidfile = self.pid_file
         context.files_preserve = [self.clilogger.get_syslog_fileno()]
@@ -122,8 +122,8 @@ def main(options):
     if options.kill:
         app.stop_daemon()
         return
-    if options.config is None:
-        print("Missing config file location in arguments")
+    if options.nhcconfig is None:
+        print("Missing NHC configuration file in arguments")
         return    
     elif options.foreground:
         app.start_foreground()
@@ -134,7 +134,7 @@ def main(options):
 if __name__ == '__main__':
     parser = ArgumentParser(description="NHC Hass bridge")
     parser.add_argument('-l', '--loglevel', help='Loglevel: d(ebug), i(nfo), w(arning), e(rror)', choices=['d','i','w','e'], default="e")
-    parser.add_argument('-c', '--config', help='Config file location', default="./nhc.yaml")
+    parser.add_argument('-n', '--nhcconfig', help='NHC configuration file', default="./nhc.yaml")
     parser.add_argument('-f', '--foreground', help='Run in foreground', default=False, action='store_true')
     parser.add_argument('-k', '--kill', help='Kill running daemon', default=False, action='store_true')
     main(parser.parse_args())

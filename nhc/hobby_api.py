@@ -101,7 +101,10 @@ class hobbyAPI(object):
             except yaml.YAMLError:
                 self.logger.fatal("config file not readable")
                 return
-            pass
+            try:
+                self.disable_marker = self.config["hass_disable_marker"]
+            except:
+                self.disable_marker = None
 
     def set_callbacks(self, device_update_callback, device_remove_callback, device_add_callback):
         self.device_update_callback = device_update_callback
@@ -210,6 +213,7 @@ class hobbyAPI(object):
         self.connected = False
         self.connect_timer.cancel()
 
+    # TODO: make this async, wait on return
     def devices_list_get(self):
         if not self.connected:
             return False
@@ -242,18 +246,14 @@ class hobbyAPI(object):
         frame["Params"] = [frame_devices]
         self.client.publish(TOPIC_DEVICES_CMD, json.dumps(frame))
 
-    def _extra_traits_in_name(self, index):
-        name = self.devices[index]["Name"]
-        namesplit = name.split("#")
-        self.devices[index]["Name"] = namesplit[0]
-        if len(namesplit) == 1:
+    def _hass_disable_marker(self, index):
+        if self.disable_marker is None:
             return
-        i = 1
-        while i < len(namesplit):
-            key = "Option" + str(i-1)
-            newtrait = {key:namesplit[i]}
-            self.devices[index]["Traits"].append(newtrait)
-            i += 1
+        name = self.devices[index]["Name"]
+        self.devices[index]["HassEnabled"] = True
+        if name.endswith(self.disable_marker):
+            self.devices[index]["HassEnabled"] = False
+
 
     def _message_devices_response(self, client, msg):
         frame = json.loads(msg.payload)
@@ -262,7 +262,7 @@ class hobbyAPI(object):
         i = 0
         # search for additional configuration in the Name property
         while i < len(self.devices):
-            self._extra_traits_in_name(i)
+            self._hass_disable_marker(i)
             i += 1
 
     def _message_devices_error(self, client, msg):
@@ -318,14 +318,14 @@ class hobbyAPI(object):
                     if self.devices[i]["Uuid"] == uuid:
                         # update existing entry
                         self.devices[i] = devices_in[dev_index]
-                        self._extra_traits_in_name(i)
+                        self._hass_disable_marker(i)
                         self.logger.info("device '%s' (%s/%s) updated", _name, _model, _type)
                         _new = False
                         break
                     i += 1
                 if _new:
                     self.devices.append(devices_in[dev_index])
-                    self._extra_traits_in_name(dev_index)
+                    self._hass_disable_marker(dev_index)
                     if self.device_add_callback is not None:
                         self.device_add_callback(devices_in[dev_index])
                     self.logger.info("device '%s' (%s/%s) added", _name, _model, _type)
@@ -352,7 +352,7 @@ class hobbyAPI(object):
                     elif method == "devices.displayname_changed":
                         new_name = devices_in[dev_index]["DisplayName"]
                         self.devices[i]["Name"] = new_name
-                        self._extra_traits_in_name(i)
+                        self._hass_disable_marker(i)
                         self.logger.info("device '%s' (%s/%s) name changed to '%s'", _name,  _model, _type, new_name)
                     elif method == "devices.changed":
                         self.devices[i]["PropertyDefinitions"] = devices_in[dev_index]["PropertyDefinitions"]

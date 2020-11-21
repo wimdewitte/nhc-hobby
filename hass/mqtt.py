@@ -133,7 +133,7 @@ class Hass(object):
             return "switch"
         elif nhc_model in ["pir", "comfort", "overallcomfort", "alloff", "generic"]:
             return "switch_mood"
-        elif nhc_model in ["alarms", "simulation"]:
+        elif nhc_model in ["alarms", "simulation", "timeschedule", "condition"]:
             self.logger.info("NHC model '%s' not supported in Hass", nhc_model)
             return None
 
@@ -142,6 +142,9 @@ class Hass(object):
         device = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
         if device is None:
             self.logger.info("device not found")
+            return False
+        if device["HassEnabled"] is False:
+            self.logger.info("'%s' disabled for discovering in Hass", device["Name"])
             return False
         self.nhc_add_device(device)
 
@@ -155,11 +158,12 @@ class Hass(object):
 
 
     def remove(self, uuid, model):
-        device = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
-        if device is not None:
-            model = self.nhc_to_hass_model(device["Model"])
         if model is None:
-            return
+            device = self.hobby.search_uuid_action(uuid, NHC_MODELS.ALL)
+            if device is not None:
+                model = self.nhc_to_hass_model(device["Model"])
+            else:
+                return
         topic = "homeassistant/" + model + "/" + uuid + "/config"
         self.client.publish(topic, '')
 
