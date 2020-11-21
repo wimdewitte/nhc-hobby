@@ -48,7 +48,7 @@ class HassLight(object):
         try:
             brightness = frame["brightness"]
             brightness = int(brightness/2.55)
-            self.hobby.devices_control(uuid, "Status", state, "Brightness", brightness)
+            self.hobby.devices_control(uuid, "Status", state, "Brightness", str(brightness))
         except:
             self.hobby.devices_control(uuid, "Status", state)
 
