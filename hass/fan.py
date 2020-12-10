@@ -1,4 +1,5 @@
 import json
+import time
 
 class HassFan(object):
     def __init__(self, logger, hass, hobby):
@@ -12,10 +13,14 @@ class HassFan(object):
         config_topic = main_topic + "/config"
         payload["~"] = main_topic
         self.hass.publish(config_topic, json.dumps(payload))
-        self.update(uuid, device["Properties"])
+        time.sleep(0.1)
+        self.update(device)
+        time.sleep(0.1)
         self.availability(uuid)
 
-    def update(self, uuid, properties):
+    def update(self, device):
+        uuid = device["Uuid"]
+        properties = device["Properties"]
         status = None
         i = 0
         while i < len(properties):

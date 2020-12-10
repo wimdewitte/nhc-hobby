@@ -8,6 +8,8 @@ import struct
 from prettytable import PrettyTable
 from uuid import UUID
 import yaml
+import time
+import datetime
 
 
 TOPIC_DEVICES_CMD = "hobby/control/devices/cmd"
@@ -186,6 +188,8 @@ class hobbyAPI(object):
             self._message_notification_event(client, msg)
         else:
             self.logger.info("Hobby mqtt message '%s' on topic: %s", msg.payload, msg.topic)
+        if msg.topic.endswith("/rsp"):
+            self.cmd_busy = False
 
     def _connect(self, client, obj, flags, rc):
         self.connected = True
@@ -213,12 +217,27 @@ class hobbyAPI(object):
         self.connected = False
         self.connect_timer.cancel()
 
-    # TODO: make this async, wait on return
+
+    def wait_on_command(self):
+        self.cmd_busy = True
+        starttime = datetime.datetime.now()
+        while datetime.datetime.now().timestamp() < starttime.timestamp() + 5:
+            if self.cmd_busy is False:
+                elapsed = datetime.datetime.now() - starttime
+                msec = elapsed.seconds*1000 + round(elapsed.microseconds/1000)
+                self.logger.info("MQTT cmd-rsp time: " + str(msec) + "ms")
+                return True
+            time.sleep(0.1)
+        return False        
+
+
     def devices_list_get(self):
         if not self.connected:
             return False
         frame = {"Method": "devices.list"}
         self.client.publish(TOPIC_DEVICES_CMD, json.dumps(frame))
+        return self.wait_on_command()
+
 
     def get_device(self, uuid):
         i = 0
@@ -254,7 +273,6 @@ class hobbyAPI(object):
         if name.endswith(self.disable_marker):
             self.devices[index]["HassEnabled"] = False
 
-
     def _message_devices_response(self, client, msg):
         frame = json.loads(msg.payload)
         self.devices = frame["Params"][0]["Devices"]
@@ -264,6 +282,8 @@ class hobbyAPI(object):
         while i < len(self.devices):
             self._hass_disable_marker(i)
             i += 1
+        self.status_update_all()
+
 
     def _message_devices_error(self, client, msg):
         frame = json.loads(msg.payload)
@@ -271,6 +291,20 @@ class hobbyAPI(object):
         code = frame["ErrCode"]
         _ = frame["Method"]
         self.logger.info("%s (code:%s)", message, code)
+
+
+    def status_update_all(self):
+        models = self.relay_models + self.dimmer_models + self.motor_models + self.mood_models
+        i = 0
+        while i < len(self.devices):
+            time.sleep(0.05)
+            _device = self.devices[i]
+            _model = _device["Model"]
+            _type = _device["Type"]
+            if _type == "action" and _model in models:
+                self.device_update_callback(_device)
+            i += 1
+
 
     def _device_status_update(self, device_index, frame):
         call_callback = True
@@ -299,7 +333,7 @@ class hobbyAPI(object):
         self.logger.info("device '%s' status changed: %s", name, frame)
         
         if self.device_update_callback is not None and call_callback:
-            self.device_update_callback(self.devices[device_index], frame)
+            self.device_update_callback(self.devices[device_index])
 
 
     def _message_devices_event(self, client, msg):

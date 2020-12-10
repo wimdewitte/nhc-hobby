@@ -1,4 +1,5 @@
 import json
+import time
 
 class HassCover(object):
     def __init__(self, logger, hass, hobby):
@@ -25,12 +26,17 @@ class HassCover(object):
         payload["state_closed"] = "CLOSE"
         payload["state_closing"] = "CLOSING"
         self.hass.publish(config_topic, json.dumps(payload))
-        self.update(uuid, device["Properties"])
+        time.sleep(0.1)
+        self.update(device)
+        time.sleep(0.1)
         self.availability(uuid)
 
-    def update(self, uuid, properties):
-        state = None
-        moving = None
+    def update(self, device):
+        uuid = device["Uuid"]
+        properties = device["Properties"]
+        state = ""
+        moving = ""
+        position = ""
         i = 0
         while i < len(properties):
             _property = list(properties[i].keys())[0]
@@ -39,13 +45,21 @@ class HassCover(object):
                 state = _value.upper()
             elif _property == "Moving":
                 moving = _value.upper()
+            elif _property == "Position":
+                position = _value.upper()
             i += 1
-        if moving is not None:
-            if state == "OPEN" and moving:
+        if moving == "TRUE":
+            if state == "OPEN" or position == "100":
                 state = "CLOSING"
-            if state == "CLOSE" and moving:
+            elif state == "CLOSE" or position == "0":
                 state = "OPENING"
-        if state is None:
+        elif moving == "FALSE":
+            if position == "0":
+                state = "CLOSE"
+            elif position == "100":
+                state = "OPEN"
+
+        if state == "":
             return
         topic = "homeassistant/cover/" + uuid + "/state"
         self.hass.publish(topic, state)

@@ -60,7 +60,7 @@ class Hass(object):
     
 
     def message(self, client, obj, msg):
-        #self.logger.info("HASS mqtt message topic:%s\n%s", msg.topic, msg.payload)
+        self.logger.info("HASS mqtt message topic:%s\n%s", msg.topic, msg.payload)
         if msg.topic == "homeassistant/status":
             self.hass_status(msg.payload)
         elif msg.topic.endswith("set"):
@@ -149,8 +149,8 @@ class Hass(object):
         self.nhc_add_device(device)
 
 
-    # todo: ask fresh list from NHC
     def discover_all(self):
+        self.hobby.devices_list_get()
         _list = self.hobby.list_uuid_action()
         for uuid in _list:
             time.sleep(0.1)
@@ -175,21 +175,20 @@ class Hass(object):
             self.remove(uuid, None)
 
 
-    def nhc_status_update(self, device, frame):
+    def nhc_status_update(self, device):
         hass_model = self.nhc_to_hass_model(device["Model"])
         if hass_model is None:
             return
-        uuid = device["Uuid"]
         if hass_model == "light":
-            self.light.update(uuid, frame["Properties"])
+            self.light.update(device)
         elif hass_model == "switch":
-            self.switch.update(uuid, frame["Properties"])
+            self.switch.update(device)
         elif hass_model == "switch_mood":
-            self.switch_mood.update(uuid, frame["Properties"])
+            self.switch_mood.update(device)
         elif hass_model == "cover":
-            self.cover.update(uuid, frame["Properties"])
+            self.cover.update(device)
         elif hass_model == "fan":
-            self.fan.update(uuid, frame["Properties"])
+            self.fan.update(device)
 
 
     def nhc_remove_device(self, uuid, model):

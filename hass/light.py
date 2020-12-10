@@ -1,4 +1,5 @@
 import json
+import time
 
 class HassLight(object):
     def __init__(self, logger, hass, hobby):
@@ -17,10 +18,14 @@ class HassLight(object):
         else:
             payload["brightness"] = False
         self.hass.publish(config_topic, json.dumps(payload))
-        self.update(uuid, device["Properties"])
+        time.sleep(0.1)
+        self.update(device)
+        time.sleep(0.1)
         self.availability(uuid)
 
-    def update(self, uuid, properties):
+    def update(self, device):
+        uuid = device["Uuid"]
+        properties = device["Properties"]
         status = None
         brightness = None
         i = 0

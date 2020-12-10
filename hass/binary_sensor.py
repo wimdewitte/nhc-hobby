@@ -1,4 +1,5 @@
 import json
+import time
 
 class HassBinarySensor(object):
     def __init__(self, logger, hass, hobby):
@@ -14,9 +15,12 @@ class HassBinarySensor(object):
         payload["off_delay"] = 10
         del(payload["command_topic"]) # a binary_sensor doesn't have a command topic
         self.hass.publish(config_topic, json.dumps(payload))
+        time.sleep(0.1)
         self.availability(uuid)
 
-    def update(self, uuid, properties):
+    def update(self, device):
+        uuid = device["Uuid"]
+        properties = device["Properties"]
         status = None
         i = 0
         while i < len(properties):
