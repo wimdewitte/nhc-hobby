@@ -297,7 +297,7 @@ class hobbyAPI(object):
         models = self.relay_models + self.dimmer_models + self.motor_models + self.mood_models
         i = 0
         while i < len(self.devices):
-            time.sleep(0.05)
+            time.sleep(0.01)
             _device = self.devices[i]
             _model = _device["Model"]
             _type = _device["Type"]
@@ -329,6 +329,9 @@ class hobbyAPI(object):
                     self.devices[device_index]["Properties"][j][_property_device] = _value_new
                 j += 1
             i += 1
+        
+        if self.devices[device_index]["HassEnabled"] is False:
+            return
 
         self.logger.info("device '%s' status changed: %s", name, frame)
         
