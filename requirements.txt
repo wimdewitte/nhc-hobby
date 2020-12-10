@@ -1,0 +1,6 @@
+cmd2
+lockfile
+prettytable
+paho_mqtt
+python_daemon
+PyYAML
