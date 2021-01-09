@@ -85,6 +85,20 @@ class CreateApp(object):
         else:
             _pidfile = "/var/tmp/nhchabridge.pid"
         self.pid_file = PIDLockFile(_pidfile)
+        self.check_stale_pid()
+
+    def check_stale_pid(self):
+        _pid = self.pid_file.read_pid()
+        if _pid is None:
+            return
+        try:
+            os.kill(_pid, 0)
+        except OSError:
+            # corresponding process doesn't exist
+            self.pid_file.break_lock()
+        else:
+            # process exist, handled further
+            pass
 
     def stop_daemon(self):
         if self.pid_file.is_locked():
@@ -93,6 +107,10 @@ class CreateApp(object):
 
     def start_foreground(self):
         self.clilogger.set_logger_stream()
+        if self.pid_file.is_locked():
+            self.logger.warn("Attention, service already running with pid %d, ", self.pid_file.read_pid())
+        else:
+            self.pid_file.acquire()
         daemon = Application(self.options, self.clilogger)
         try:
             daemon.run(foreground=True)
