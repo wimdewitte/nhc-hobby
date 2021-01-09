@@ -282,8 +282,7 @@ class hobbyAPI(object):
         while i < len(self.devices):
             self._hass_disable_marker(i)
             i += 1
-        self.status_update_all()
-
+        self.status_add_all()
 
     def _message_devices_error(self, client, msg):
         frame = json.loads(msg.payload)
@@ -293,7 +292,7 @@ class hobbyAPI(object):
         self.logger.info("%s (code:%s)", message, code)
 
 
-    def status_update_all(self):
+    def status_add_all(self):
         models = self.relay_models + self.dimmer_models + self.motor_models + self.mood_models
         i = 0
         while i < len(self.devices):
@@ -302,7 +301,7 @@ class hobbyAPI(object):
             _model = _device["Model"]
             _type = _device["Type"]
             if _type == "action" and _model in models:
-                self.device_update_callback(_device)
+                self.device_add_callback(_device)
             i += 1
 
 
